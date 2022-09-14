@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "scribe"
+version = "0.1.0"
+description = "Personal blog generation engine for freeman.vc"
+authors = ["Pierce Freeman <pierce@freeman.vc>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+jinja2 = "^3.1.2"
+click = "^8.0.1"
+Markdown = "^3.4.1"
+Pygments = "^2.13.0",
+pygments-ansi-color = "^0.0.6"
+fastapi = "^0.83.0"
+uvicorn = "^0.18.3"
+python-dateutil = "^2.8.2"
+watchdog = "^2.1.9"
+beautifulsoup4 = "^4.11.1"
+pillow = "^9.2.0",
+PyYAML = "^6.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+start-writing = "scribe.cli.launch:main"
+build-notes = "scribe.cli.build:main"
+
+[tool.isort]
+combine_as_imports = True
+force_grid_wrap = 4
+float_to_top = True
+include_trailing_comma = True
+known_first_party = scribe
+extra_standard_library = pkg_resources
+skip = __init__.py
+
+line_length = 99
+lines_after_imports = 2
+multi_line_output = 3

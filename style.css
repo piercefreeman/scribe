@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+ * 8-bit terminal color support
+ *
+ * Colors should be added to the safelist in tailwind.config
+ * because they are generated dynamically by our build pipeline
+ * and therefore aren't detected by the tree shaking.
+ */
+
+ @layer components {
+    .-Color-Black {
+        @apply text-black;
+    }
+    .-Color-Red {
+        @apply text-red-500;
+    }
+    .-Color-Green {
+        @apply text-green-500;
+    }
+    .-Color-Yellow {
+        @apply text-yellow-500;
+    }
+    .-Color-Blue {
+        @apply text-blue-500;
+    }
+    .-Color-Magenta {
+        @apply text-fuchsia-500;
+    }
+    .-Color-Cyan {
+        @apply text-cyan-500;
+    }
+    .-Color-White {
+        @apply text-white;
+    }
+ }
