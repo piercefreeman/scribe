@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+
+<channel>
+  <title>Pierce Freeman Notes</title>
+  <link>https://freeman.vc</link>
+  <description>Thoughts on entrepreneurship and life.</description>
+  {% for note in notes %}
+  <item>
+    <title>{{note.title}}</title>
+    <link>https://freeman.vc/notes/{{note.webpage_path}}</link>
+    <summary type="text">{{note.simple_content | truncate(200, false, '...')}}</summary>
+    <content type="html"><![CDATA[ {{note.get_html()}} ]]></content>
+  </item>
+  {% endfor %}
+</channel>
+
+</rss>
