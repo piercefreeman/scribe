@@ -12,8 +12,8 @@ from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
 from PIL.Image import Resampling
 
-from website_builder.io import get_asset_path
-from website_builder.note import InvalidMetadataException, Note, NoteStatus
+from scribe.io import get_asset_path
+from scribe.note import InvalidMetadataException, Note, NoteStatus
 
 
 def filter_tag(notes: List[Note], tag_values: Union[str, List[str]]):

@@ -56,7 +56,7 @@ class NoteMetadata(BaseModel):
     # URLs in addition to the system-given URLs
     # This is primarily useful to keep backwards compatibility with
     # posts that change over time
-    urls: List[str] = []
+    # urls: List[str] = []
 
     # Featured photos are paths to photos that should be featured in photo sections
     # They can be separate from those that are contained in the body of the post
