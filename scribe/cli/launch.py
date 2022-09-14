@@ -7,13 +7,13 @@ from click import command, option, secho
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from website_builder.cli.runserver import runserver
-from website_builder.io import get_asset_path
+from scribe.cli.runserver import runserver
+from scribe.io import get_asset_path
 
 
 class NotesChangedEventHandler(FileSystemEventHandler):
     def __init__(self, note_path, output_path):
-        self.website_builder_path = get_asset_path("")
+        self.scribe_path = get_asset_path("")
         self.note_path = note_path
         self.output_path = output_path
 
@@ -21,7 +21,7 @@ class NotesChangedEventHandler(FileSystemEventHandler):
 
     def on_any_event(self, event):
         # TODO: Why is this running twice
-        if str(self.website_builder_path) in event.src_path:
+        if str(self.scribe_path) in event.src_path:
             secho("website code changed", fg="yellow")
         elif str(self.note_path) in event.src_path:
             secho("note changed", fg="yellow")

@@ -4,7 +4,7 @@ from shutil import rmtree
 from click import Path as ClickPath
 from click import command, option, secho
 
-from website_builder.builder import WebsiteBuilder
+from scribe.builder import WebsiteBuilder
 
 
 def build(notes_path, output_path):

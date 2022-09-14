@@ -3,8 +3,8 @@ from tempfile import TemporaryDirectory
 
 from pytest import fixture
 
-from website_builder.builder import WebsiteBuilder
-from website_builder.note import Note
+from scribe.builder import WebsiteBuilder
+from scribe.note import Note
 
 
 @fixture()

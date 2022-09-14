@@ -1,6 +1,6 @@
 from re import match
 
-from website_builder.note import Note, NoteStatus
+from scribe.note import Note, NoteStatus
 
 
 def test_title():
