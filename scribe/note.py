@@ -182,7 +182,7 @@ class Note:
                 parsed_lines.append(i)
 
         if not metadata_string:
-            # If users haven't specified metadata, assume it is a draft
+            # If users haven't specified metadata, assume it is a scratch note
             return ParsedPayload(NoteMetadata(date=datetime.now().isoformat()), [])
 
         try:
