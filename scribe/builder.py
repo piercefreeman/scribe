@@ -163,7 +163,9 @@ class WebsiteBuilder:
         for path in notes_path.rglob("*"):
             if path.suffix == ".md":
                 try:
-                    notes.append(Note.from_file(path))
+                    note = Note.from_file(path)
+                    if note.metadata.status in {NoteStatus.DRAFT, NoteStatus.PUBLISHED}:
+                        notes.append(note)
                 except InvalidMetadataException as e:
                     secho(f"Invalid metadata: {path}: {e}", fg="red")
                     found_error = True
