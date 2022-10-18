@@ -28,6 +28,9 @@ class NotesChangedEventHandler(FileSystemEventHandler):
         else:
             return
 
+        self.build_notes()
+
+    def build_notes(self):
         # Cancel any outdated build requests
         if self.builder_process:
             self.builder_process.terminate()
@@ -50,6 +53,9 @@ def main(notes, output, port):
     style_process.start()
 
     event_handler = NotesChangedEventHandler(notes, output)
+
+    # Initial run to generate right when the CLI command is run
+    event_handler.build_notes()
 
     observer = Observer()
     observer.schedule(event_handler, ".", recursive=True)
