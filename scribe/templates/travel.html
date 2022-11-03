@@ -17,15 +17,22 @@ Travel
         <p class="mt-4">I try to write about every place I visit. Right now I'm in <span class="font-bold">New York City, USA</span>.</p>
     </div>
 
-    <div class="mt-4 py-4 border-y border-gray-200 border-dashed">
-        <ul class="grid gap-y-4">
+    <div class="mt-4 border-y border-gray-200 border-dashed">
+        <div class="divide-y">
             {% for note in filter_tag(notes, "travel") %}
-            <li>
-                <div><a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-medium" href="./notes/{{note.webpage_path}}">{{note.title}}</a></div>
-                <div class="text-gray-600 dark:text-gray-500 text-lg md:text-sm">{{note.metadata.date.strftime("%B %-d, %Y")}}</div>
-            </li>
+            <div>
+                <a href="./notes/{{note.webpage_path}}">
+                    <div class="py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-800">
+                            <div class="text-orange-500 dark:text-orange-600 font-medium">{{note.title}}</div>
+                            <div class="mt-2 text-gray-600 dark:text-gray-300 text-sm space-y-2">
+                                <p><span class="text-gray-500 dark:text-gray-400">[Read time: {{ note.read_time_minutes }} minutes]</span> {{note.metadata.subtitle[0]}}</p>        
+                            </div>
+                            <div class="mt-1 text-gray-400 dark:text-gray-500 text-lg md:text-sm">- {{note.metadata.date.strftime("%B %-d, %Y")}}</div>
+                    </div>
+                </a>
+            </div>
             {% endfor %}
-        </ul>
+        </div>
     </div>    
 </div>
 
