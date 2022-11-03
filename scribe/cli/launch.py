@@ -59,6 +59,7 @@ def main(notes, output, port):
 
     observer = Observer()
     observer.schedule(event_handler, ".", recursive=True)
+    observer.schedule(event_handler, get_asset_path("templates"), recursive=True)
     observer.start()
     try:
         while True:

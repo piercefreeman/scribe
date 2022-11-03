@@ -52,6 +52,7 @@ class NoteMetadata(BaseModel):
     #status: NoteStatus = NoteStatus.SCRATCH
     # TODO: Fix the typing here
     status: Any = NoteStatus.SCRATCH
+    subtitle: List[str] = []
 
     # URLs in addition to the system-given URLs
     # This is primarily useful to keep backwards compatibility with
@@ -283,3 +284,10 @@ class Note:
             img["class"] = " ".join([*img.get("class", []), "rounded-sm"])
 
         return str(content)
+
+    @property
+    def read_time_minutes(self):
+        # https://www.sciencedirect.com/science/article/abs/pii/S0749596X19300786
+        WPM = 238
+        words = len(self.text.split())
+        return (words // WPM) + 1
