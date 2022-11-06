@@ -11,23 +11,22 @@ Travel
         {%include "logo.html"%}
     {% endwith %}
 </div>
-<div class="mt-8 max-w-2xl mx-auto px-4 text-gray-900 dark:text-gray-100 text-lg md:text-base">
+<div class="mt-8 max-w-2xl mx-auto px-4 text-gray-900 dark:text-gray-100 md:text-base">
     <div>
         <p>In the middle of 2022 I gave up my apartment to visit more places on each continent. I realized that the best way to really understand a city - to meet locals, to try the food, to pass a sunny weekend - is by working there. You'll usually find me on work days with an espresso in a rotating cast of coffee shops.</p>
-        <p class="mt-4">I try to write about every place I visit. Right now I'm in <span class="font-bold">New York City, USA</span>.</p>
     </div>
 
-    <div class="mt-4 border-y border-gray-200 border-dashed">
-        <div class="divide-y">
+    <div class="mt-4 border-y border-slate-200 dark:border-slate-800 border-dashed">
+        <div class="divide-y divide-slate-200 dark:divide-slate-800">
             {% for note in filter_tag(notes, "travel") %}
             <div>
                 <a href="./notes/{{note.webpage_path}}">
                     <div class="py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-800">
                             <div class="text-orange-700 dark:text-orange-300 font-semibold text-3xl">{{note.title}}</div>
-                            <div class="mt-2 text-gray-600 dark:text-gray-300 text-lg md:text-sm space-y-2">
+                            <div class="mt-2 text-gray-600 dark:text-gray-300 md:text-sm space-y-2">
                                 <p><span class="text-gray-500 dark:text-gray-400">[Read time: {{ note.read_time_minutes }} minutes]</span> {{note.metadata.subtitle[0]}}</p>        
                             </div>
-                            <div class="mt-1 text-gray-400 dark:text-gray-500 text-lg md:text-sm">- {{note.metadata.date.strftime("%B %-d, %Y")}}</div>
+                            <div class="mt-1 text-gray-400 dark:text-gray-500 md:text-sm">- {{note.metadata.date.strftime("%B %-d, %Y")}}</div>
                     </div>
                 </a>
             </div>
