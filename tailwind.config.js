@@ -25,17 +25,20 @@ module.exports = {
             '--tw-prose-links': theme('colors.blue[500]'),
             '--tw-prose-invert-links': theme('colors.blue[300]'),
             '--tw-prose-quotes': theme('colors.gray[500]'),
+            '--tw-prose-invert-body': theme('colors.gray[200]'),
             a: {
               textDecoration: 'none',
               fontWeight: '500',
             },
             p: {
-              //lineHeight: '1.6em',
-              //fontSize: '17px',
-              fontSize: '1.1rem',
+              fontSize: "20px",
+              lineHeight: 1.7
             },
             ul: {
-              fontSize: '1.1rem',
+              fontSize: "20px",
+            },
+            ol: {
+              fontSize: "20px",
             },
             img: {
               borderRadius: theme('rounded'),

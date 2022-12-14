@@ -464,6 +464,7 @@ Ensure the default browser behavior of the `hidden` attribute.
 .prose :where(ol):not(:where([class~="not-prose"] *)) {
   list-style-type: decimal;
   padding-left: 1.625em;
+  font-size: 20px;
 }
 
 .prose :where(ol[type="A"]):not(:where([class~="not-prose"] *)) {
@@ -505,7 +506,7 @@ Ensure the default browser behavior of the `hidden` attribute.
 .prose :where(ul):not(:where([class~="not-prose"] *)) {
   list-style-type: disc;
   padding-left: 1.625em;
-  font-size: 1.1rem;
+  font-size: 20px;
 }
 
 .prose :where(ol > li):not(:where([class~="not-prose"] *))::marker {
@@ -720,7 +721,7 @@ Ensure the default browser behavior of the `hidden` attribute.
   --tw-prose-pre-bg: #1f2937;
   --tw-prose-th-borders: #d1d5db;
   --tw-prose-td-borders: #e5e7eb;
-  --tw-prose-invert-body: #d1d5db;
+  --tw-prose-invert-body: #e5e7eb;
   --tw-prose-invert-headings: #fff;
   --tw-prose-invert-lead: #9ca3af;
   --tw-prose-invert-links: #93c5fd;
@@ -743,7 +744,8 @@ Ensure the default browser behavior of the `hidden` attribute.
 .prose :where(p):not(:where([class~="not-prose"] *)) {
   margin-top: 1.25em;
   margin-bottom: 1.25em;
-  font-size: 1.1rem;
+  font-size: 20px;
+  line-height: 1.7;
 }
 
 .prose :where(img):not(:where([class~="not-prose"] *)) {
@@ -1040,6 +1042,10 @@ Ensure the default browser behavior of the `hidden` attribute.
   max-width: 56rem;
 }
 
+.max-w-3xl {
+  max-width: 48rem;
+}
+
 .max-w-none {
   max-width: none;
 }
@@ -1141,11 +1147,6 @@ Ensure the default browser behavior of the `hidden` attribute.
   border-bottom-width: calc(1px * var(--tw-divide-y-reverse));
 }
 
-.divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
-  --tw-divide-opacity: 1;
-  border-color: rgb(30 41 59 / var(--tw-divide-opacity));
-}
-
 .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
   --tw-divide-opacity: 1;
   border-color: rgb(226 232 240 / var(--tw-divide-opacity));
@@ -1186,6 +1187,10 @@ Ensure the default browser behavior of the `hidden` attribute.
 
 .border-t {
   border-top-width: 1px;
+}
+
+.border-b {
+  border-bottom-width: 1px;
 }
 
 .border-dashed {
@@ -1315,10 +1320,6 @@ Ensure the default browser behavior of the `hidden` attribute.
 
 .font-medium {
   font-weight: 500;
-}
-
-.font-extrabold {
-  font-weight: 800;
 }
 
 .leading-8 {
@@ -1534,6 +1535,10 @@ Ensure the default browser behavior of the `hidden` attribute.
   background-color: rgb(147 197 253 / var(--tw-bg-opacity));
 }
 
+.prose-img\:m-0 :is(:where(img):not(:where([class~="not-prose"] *))) {
+  margin: 0px;
+}
+
 .dark .dark\:prose-invert {
   --tw-prose-body: var(--tw-prose-invert-body);
   --tw-prose-headings: var(--tw-prose-invert-headings);
@@ -1551,11 +1556,6 @@ Ensure the default browser behavior of the `hidden` attribute.
   --tw-prose-pre-bg: var(--tw-prose-invert-pre-bg);
   --tw-prose-th-borders: var(--tw-prose-invert-th-borders);
   --tw-prose-td-borders: var(--tw-prose-invert-td-borders);
-}
-
-.dark .dark\:divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
-  --tw-divide-opacity: 1;
-  border-color: rgb(226 232 240 / var(--tw-divide-opacity));
 }
 
 .dark .dark\:divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
