@@ -1539,6 +1539,31 @@ Ensure the default browser behavior of the `hidden` attribute.
   margin: 0px;
 }
 
+.prose-img\:mx-auto :is(:where(img):not(:where([class~="not-prose"] *))) {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.prose-img\:max-h-96 :is(:where(img):not(:where([class~="not-prose"] *))) {
+  max-height: 24rem;
+}
+
+.prose-img\:max-h-\[32rem\] :is(:where(img):not(:where([class~="not-prose"] *))) {
+  max-height: 32rem;
+}
+
+.prose-img\:max-h-\[40rem\] :is(:where(img):not(:where([class~="not-prose"] *))) {
+  max-height: 40rem;
+}
+
+.prose-img\:w-2 :is(:where(img):not(:where([class~="not-prose"] *))) {
+  width: 0.5rem;
+}
+
+.prose-img\:max-w-2xl :is(:where(img):not(:where([class~="not-prose"] *))) {
+  max-width: 42rem;
+}
+
 .dark .dark\:prose-invert {
   --tw-prose-body: var(--tw-prose-invert-body);
   --tw-prose-headings: var(--tw-prose-invert-headings);
