@@ -11,17 +11,51 @@
 
 <div class="rounded-sm"></div>
 
-<article class="max-w-3xl mx-auto mt-6">
+<div class="max-w-3xl mx-auto mt-6 pb-8">
     <div class="px-4">
-        <div>
-            <h1 class="block text-3xl text-center leading-8 font-medium tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">{{header}}</h1>
+        <article>
+            <div>
+                <h1 class="block text-3xl text-center leading-8 font-medium tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">{{header}}</h1>
+            </div>
+            <div class="mt-2 text-lg text-gray-500 text-center">
+                <h6>{{metadata.date.strftime("%B %-d, %Y")}}</h6>
+            </div>
+            <div class="mt-4 prose prose-img:m-0 dark:prose-invert max-w-none">
+                {{content|safe}}
+            </div>
+        </article>
+
+        <div class="mt-8">
+            <div class="rounded-lg bg-gray-900 dark:bg-gray-200 px-6 py-8">
+                <div class="text-base text-gray-200 dark:text-gray-900">
+                    <h2 class="text-3xl font-bold tracking-tight">Stay in Touch</h2>
+                    <p class="mt-4">I write mostly about engineering, machine learning, and company building. If you want to get updated about longer essays, subscribe here.</p>                    
+                    <p class="mt-4">I hate spam so I keep these infrequent. I also still send emails with my personal account, so this is about as non-corporate as you can get.</p>
+                </div>
+    
+                <div class="mt-4 flex gap-x-4">
+                    <label htmlFor="email-address" class="sr-only">
+                      Email address
+                    </label>
+                    <input
+                      id="email-address"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-white dark:text-gray-900 shadow-sm ring-1 ring-inset ring-white/10 dark:ring-inset dark:ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6"
+                      placeholder="Enter your email"
+                    />
+                    <button
+                      type="submit"
+                      class="flex-none rounded-md bg-indigo-500 py-2.5 px-3.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                    >
+                      Subscribe
+                    </button>
+                  </div>
+            </div>
         </div>
-        <div class="mt-2 text-lg text-gray-500 text-center">
-            <h6>{{metadata.date.strftime("%B %-d, %Y")}}</h6>
-        </div>
-        <div class="mt-4 pb-8 prose prose-img:m-0 dark:prose-invert max-w-none">
-            {{content|safe}}
-        </div>    
     </div>
-</article>
+</div>
+
 {% endblock %}
