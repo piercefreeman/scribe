@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+
 from scribe.note import Note
+
 
 @dataclass
 class PageDirection:

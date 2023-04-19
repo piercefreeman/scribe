@@ -3,7 +3,12 @@ from datetime import datetime
 from enum import Enum, unique
 from pathlib import Path
 from re import findall, sub
-from typing import Any, List, Optional, Union
+from typing import (
+    Any,
+    List,
+    Optional,
+    Union,
+)
 
 from bs4 import BeautifulSoup
 from dateutil import parser as date_parser

@@ -3,7 +3,9 @@ Utilities mounted and callable within Jinja.
 
 """
 from collections import defaultdict
+
 from scribe.note import Note
+
 
 def filter_tag(
     notes: list[Note],

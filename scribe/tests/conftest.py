@@ -1,9 +1,9 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from scribe.builder import WebsiteBuilder
-
 import pytest
+
+from scribe.builder import WebsiteBuilder
 
 
 @pytest.fixture()

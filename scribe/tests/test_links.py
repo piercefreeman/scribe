@@ -1,6 +1,7 @@
 from scribe.links import local_to_remote_links
 from scribe.note import Note
 
+
 def test_local_link(note_directory):
     text = "#Header\nthis is a [local path](./Local.md) other phrase ()"
 

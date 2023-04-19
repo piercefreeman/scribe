@@ -2,8 +2,12 @@ from multiprocessing import Process
 from os import system
 from time import sleep
 
-from click import Path as ClickPath
-from click import command, option, secho
+from click import (
+    Path as ClickPath,
+    command,
+    option,
+    secho,
+)
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
