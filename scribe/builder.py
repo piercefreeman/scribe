@@ -13,6 +13,7 @@ from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
 from PIL.Image import Resampling
 from collections import defaultdict
+from time import time
 
 from scribe.io import get_asset_path
 from scribe.note import InvalidMetadataException, Note, NoteStatus
@@ -144,7 +145,7 @@ class WebsiteBuilder:
         )
         self.build_static(output_path)
 
-    def build_notes(self, notes: List[Note], output_path):
+    def build_notes(self, notes: List[Note], output_path: Path):
         # Upload the note assets
         for note in notes:
             for asset in note.assets:
@@ -160,11 +161,13 @@ class WebsiteBuilder:
                 # Copy the preview image
                 # Use a relative path to make sure we place it correctly in the output path
                 remote_path = output_path / f"./{asset.remote_preview_path}"
-                copyfile(asset.local_preview_path, remote_path)
+                if not remote_path.exists():
+                    copyfile(asset.local_preview_path, remote_path)
 
                 # Copy the raw
                 remote_path = output_path / f"./{asset.remote_path}"
-                copyfile(asset.local_path, remote_path)
+                if not remote_path.exists():
+                    copyfile(asset.local_path, remote_path)
 
         # Build the posts
         post_template = self.env.get_template("post.html")
@@ -324,7 +327,7 @@ class WebsiteBuilder:
             
             filename = Path(local_link).with_suffix("").name
             if filename not in path_to_remote:
-                raise ValueError(f"Incorrect link {note.filename}, not found locally: {match.group(0)}")
+                raise ValueError(f"Incorrect link\n Problem Note: {note.filename}\n Link not found locally: {match.group(0)}")
             remote_path = path_to_remote[filename]
             to_replace.append((text, local_link, remote_path))
 

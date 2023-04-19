@@ -1,5 +1,6 @@
 from pathlib import Path
 from shutil import rmtree
+from os import unlink
 
 from click import Path as ClickPath
 from click import command, option, secho
@@ -19,12 +20,21 @@ def build(notes_path, output_path):
 @command()
 @option("--notes", type=ClickPath(exists=True, dir_okay=True), required=True)
 @option("--output", default="static")
-def main(notes, output):
-    if Path(output).exists():
-        secho("Removing previous output...", fg="yellow")
-        # When ignore_errors is False, we see an occasional race condition on successive
-        # fast saves where we might still be populating this directory before starting to build
-        # again. This results in a broken state & crash where we have a mostly empty static
-        # directory and the webserver is unable to render the page.
-        rmtree(output, ignore_errors=True)
+@option("--clean", is_flag=True, default=False)
+def main(notes, output, clean: bool):
+    if clean:
+        if Path(output).exists():
+            secho("Removing all previous output...", fg="yellow")
+            # When ignore_errors is False, we see an occasional race condition on successive
+            # fast saves where we might still be populating this directory before starting to build
+            # again. This results in a broken state & crash where we have a mostly empty static
+            # directory and the webserver is unable to render the page.
+            rmtree(output, ignore_errors=True)
+    else:
+        # Just delete the html files, keep the media
+        if Path(output).exists():
+            secho("Removing previous html output...", fg="yellow")
+            for item in Path(output).glob("**/*.html"):
+                unlink(item)
+                
     build(notes, output)

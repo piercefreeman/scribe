@@ -18,7 +18,7 @@ Travel
                 {% for note in filter_tag(notes, "travel") %}
                     {% for asset in note.featured_assets %}
                         <a href="/notes/{{note.webpage_path}}">
-                            <img src="{{asset.remote_preview_path}}" class="rounded-lg object-cover h-56 md:h-96 w-96 {% if loop.index is divisibleby 2 %}rotate-1{% else %}-rotate-1{% endif %}" />
+                            <img src="{{asset.remote_preview_path}}" class="rounded-lg object-cover h-56 md:h-96 w-96 transition {% if loop.index is divisibleby 2 %}rotate-1{% else %}-rotate-1{% endif %} hover:rotate-0 hover:shadow-lg" />
                         </a>
                     {% endfor %}
                 {% endfor %}
