@@ -51,7 +51,7 @@ def main(notes: str, output: str, port: int, env: str):
     runserver_process.start()
 
     # Launch the styling refresh system
-    style_process = Process(target=system, args=[f"cd {get_asset_path('../')} && npx tailwindcss -o {get_asset_path('resources/style.css')} --watch"])
+    style_process = Process(target=system, args=[f"cd {get_asset_path('../')} && npm run styles-watch"])
     style_process.start()
 
     event_handler = NotesChangedEventHandler(notes, output, env)

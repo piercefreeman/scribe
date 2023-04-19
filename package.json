@@ -9,6 +9,8 @@
     "tailwindcss": "^3.0.8"
   },
   "scripts": {
+    "styles-build": "npx tailwindcss -o scribe/resources/style.css",
+    "styles-watch": "npx tailwindcss -o scribe/resources/style.css --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
