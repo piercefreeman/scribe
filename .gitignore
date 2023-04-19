@@ -130,4 +130,4 @@ dmypy.json
 
 node_modules
 
-resources/style.css
+**/resources/style.css
