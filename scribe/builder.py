@@ -14,6 +14,7 @@ from scribe.template_utilities import filter_tag, group_by_month
 from scribe.models import PageDefinition, TemplateArguments, PageDirection
 from scribe.constants import SINGLE_PAGE_NOTE_LIMIT
 from scribe.links import local_to_remote_links
+from os import getenv
 
 
 class WebsiteBuilder:
@@ -36,7 +37,12 @@ class WebsiteBuilder:
         (output_path / "images").mkdir(exist_ok=True)
 
         all_notes = self.get_notes(notes_path)
-        published_notes = [note for note in all_notes if note.metadata.status == NoteStatus.PUBLISHED]
+        # When developing locally it's nice to preview draft notes on the homepage as they will look live
+        # But require this as an explicit env variable
+        if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
+            published_notes = all_notes
+        else:
+            published_notes = [note for note in all_notes if note.metadata.status == NoteStatus.PUBLISHED]
 
         # Build all notes that are either in draft form or published. Draft notes require a unique
         # URL to access them but should be displayed publically

@@ -1,6 +1,6 @@
 from pathlib import Path
 from shutil import rmtree
-from os import unlink
+from os import unlink, environ
 
 from click import Path as ClickPath
 from click import command, option, secho
@@ -21,7 +21,11 @@ def build(notes_path, output_path):
 @option("--notes", type=ClickPath(exists=True, dir_okay=True), required=True)
 @option("--output", default="static")
 @option("--clean", is_flag=True, default=False)
-def main(notes, output, clean: bool):
+@option("--env", default="PRODUCTION")
+def main(notes: str, output: str, clean: bool, env: str):
+    environ["SCRIBE_ENVIRONMENT"] = env
+    secho(f"Environment: {env}")
+
     if clean:
         if Path(output).exists():
             secho("Removing all previous output...", fg="yellow")
