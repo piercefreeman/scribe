@@ -5,7 +5,8 @@ from re import escape as re_escape
 from re import finditer, sub
 from shutil import copyfile
 from sys import maxsize
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Any
+from math import floor
 
 from click import secho
 from jinja2 import Environment, PackageLoader, select_autoescape
@@ -15,11 +16,12 @@ from PIL.Image import Resampling
 from scribe.io import get_asset_path
 from scribe.note import InvalidMetadataException, Note, NoteStatus
 
+SINGLE_PAGE_NOTE_LIMIT = 5
 
 def filter_tag(
     notes: List[Note],
     tag_values: Union[str, List[str]],
-    offset: int | None = None,
+    offset: int = 0,
     limit: int | None = None,
 ):
     """
@@ -53,10 +55,39 @@ def filter_tag(
     return notes    
 
 
+def get_page_direction(
+    notes: List[Note],
+    tag_values: Union[str, List[str]],
+    offset: int = 0,
+    limit: int | None = None,
+) -> list[tuple[str, int]]:
+    """
+    :returns if navigation is possible, returns the int of the page number
+        in the paginated sequence.
+
+    """
+    # Apply the basic filter first (no filtering)
+    notes = filter_tag(notes, tag_values)
+
+    allowed_directions = []
+
+    # Determine if the user can navigate in the direction of interest
+    if offset and offset > 0:
+        previous_offset = max(floor((offset - limit) / limit), 0)
+        allowed_directions.append(("previous", previous_offset))
+    if offset + limit < len(notes):
+        next_offset = floor((offset + limit) / limit)
+        allowed_directions.append(("next", next_offset))
+
+    return allowed_directions
+
+
 @dataclass
 class PageDefinition:
     template: str
     url: str
+    # Additional page arguments that are passed to the template
+    page_args: dict[str, Any] = None
 
 
 class WebsiteBuilder:
@@ -67,6 +98,7 @@ class WebsiteBuilder:
         )
 
         self.env.globals["filter_tag"] = filter_tag
+        self.env.globals["get_page_direction"] = get_page_direction
 
     def build(self, notes_path: Union[str, Path], output_path: Union[str, Path]):
         notes_path = Path(notes_path).expanduser()
@@ -84,7 +116,7 @@ class WebsiteBuilder:
             [
                 PageDefinition("home.html", "index.html"),
                 PageDefinition("rss.xml", "rss.xml"),
-                PageDefinition("notes.html", "notes.html"),
+                PageDefinition("notes.html", "notes.html", page_args=dict(offset=0, limit=SINGLE_PAGE_NOTE_LIMIT)),
                 PageDefinition("travel.html", "travel.html"),
                 PageDefinition("about.html", "about.html"),
             ],
@@ -95,6 +127,7 @@ class WebsiteBuilder:
             PageDefinition("notes.html", "notes.html"),
             notes,
             output_path / "notes",
+            SINGLE_PAGE_NOTE_LIMIT,
         )
         self.build_static(output_path)
 
@@ -137,13 +170,15 @@ class WebsiteBuilder:
         page: PageDefinition,
         notes: List[Note],
         output_path: Path,
-        limit: int = 5,
+        limit: int,
     ):
         """
         Build paginated items that chunk the notes by a given page limit
 
         """
         # Limit to just published notes
+        # NOTE: This currently might produce a few more pages than we intend, because we are only filtering
+        # for the publishing status and not the valid tags
         notes = [note for note in notes if note.metadata.status == NoteStatus.PUBLISHED]
 
         for i, offset in enumerate(range(0, len(notes), limit)):
@@ -170,6 +205,7 @@ class WebsiteBuilder:
                 file.write(
                     template.render(
                         notes=notes,
+                        **(page.page_args or {})
                     )
                 )
 
