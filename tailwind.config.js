@@ -30,7 +30,7 @@ module.exports = {
               textDecoration: 'none',
               fontWeight: '500',
             },
-            p: {
+            /*p: {
               fontSize: "20px",
               lineHeight: 1.7
             },
@@ -39,7 +39,7 @@ module.exports = {
             },
             ol: {
               fontSize: "20px",
-            },
+            },*/
             img: {
               borderRadius: theme('rounded'),
             },

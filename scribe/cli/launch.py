@@ -12,10 +12,11 @@ from scribe.io import get_asset_path
 
 
 class NotesChangedEventHandler(FileSystemEventHandler):
-    def __init__(self, note_path, output_path):
+    def __init__(self, note_path, output_path, env):
         self.scribe_path = get_asset_path("")
         self.note_path = note_path
         self.output_path = output_path
+        self.env = env
 
         self.builder_process = None
 
@@ -23,8 +24,8 @@ class NotesChangedEventHandler(FileSystemEventHandler):
         # TODO: Why is this running twice
         if str(self.scribe_path) in event.src_path:
             secho("website code changed", fg="yellow")
-        elif str(self.note_path) in event.src_path:
-            secho("note changed", fg="yellow")
+        elif str(self.note_path) in event.src_path and "static" not in event.src_path:
+            secho("note changed: `{event.src_path}`", fg="yellow")
         else:
             return
 
@@ -35,7 +36,7 @@ class NotesChangedEventHandler(FileSystemEventHandler):
         if self.builder_process:
             self.builder_process.terminate()
 
-        self.builder_process = Process(target=system, args=[f"build-notes --notes {self.note_path} --output {self.output_path}"])
+        self.builder_process = Process(target=system, args=[f"build-notes --notes {self.note_path} --output {self.output_path} --env {self.env}"])
         self.builder_process.start()
 
 
@@ -43,7 +44,8 @@ class NotesChangedEventHandler(FileSystemEventHandler):
 @option("--notes", type=ClickPath(dir_okay=True), required=True)
 @option("--output", default="static")
 @option("--port", default=3100)
-def main(notes, output, port):
+@option("--env", default="DEVELOPMENT")
+def main(notes: str, output: str, port: int, env: str):
     # Launch the server
     runserver_process = Process(target=runserver, args=[output, port])
     runserver_process.start()
@@ -52,7 +54,7 @@ def main(notes, output, port):
     style_process = Process(target=system, args=[f"cd {get_asset_path('../')} && npx tailwindcss -o {get_asset_path('resources/style.css')} --watch"])
     style_process.start()
 
-    event_handler = NotesChangedEventHandler(notes, output)
+    event_handler = NotesChangedEventHandler(notes, output, env)
 
     # Initial run to generate right when the CLI command is run
     event_handler.build_notes()
