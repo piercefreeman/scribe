@@ -11,34 +11,30 @@ Travel
         {%include "logo.html"%}
     {% endwith %}
 </div>
-<div class="mt-8 max-w-2xl mx-auto px-4 text-gray-900 dark:text-gray-100 md:text-base">
-    <div class="mt-4 border-b border-slate-200 dark:border-slate-800 border-dashed">
-        <div class="divide-y divide-slate-200 dark:divide-slate-800">
+<div class="mt-8 max-w-6xl mx-auto px-4 text-gray-900 dark:text-gray-100 text-base">
+    <div class="mt-4 grid grid-cols-4 gap-x-2">
+        <div class="col-span-3 divide-y divide-slate-200 dark:divide-slate-800">
+            <div class="mt-12 grid max-w-5xl mx-auto sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4 items-center justify-center px-4">
+                {% for note in filter_tag(notes, "travel") %}
+                    {% for asset in note.featured_assets %}
+                        <a href="/notes/{{note.webpage_path}}">
+                            <img src="{{asset.remote_preview_path}}" class="rounded-lg object-cover h-56 md:h-96 w-96 {% if loop.index is divisibleby 2 %}rotate-1{% else %}-rotate-1{% endif %}" />
+                        </a>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+        <div>
             {% for note in filter_tag(notes, "travel") %}
             <div>
                 <a href="./notes/{{note.webpage_path}}">
-                    <div class="py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-800">
-                            <div class="text-orange-700 dark:text-orange-300 font-semibold text-3xl">{{note.title}}</div>
-                            <div class="mt-2 text-gray-600 dark:text-gray-300 md:text-sm space-y-2">
-                                <p><span class="text-gray-500 dark:text-gray-400">[Read time: {{ note.read_time_minutes }} minutes]</span> {{note.metadata.subtitle[0]}}</p>        
-                            </div>
-                            <div class="mt-1 text-gray-400 dark:text-gray-500 md:text-sm">- {{note.metadata.date.strftime("%B %-d, %Y")}}</div>
+                    <div class="py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md">
+                        <div class="text-black-900 dark:text-gray-200 font-semibold text-sm">{{note.title}}</div>
                     </div>
                 </a>
             </div>
             {% endfor %}
         </div>
-    </div>    
-</div>
-
-    <div class="mt-12 grid max-w-5xl mx-auto grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 items-center px-4">
-        {% for note in filter_tag(notes, "travel") %}
-            {% for asset in note.featured_assets %}
-                <a href="/notes/{{note.webpage_path}}">
-                    <img src="{{asset.remote_preview_path}}" class="rounded-lg object-cover h-56 md:h-96 w-96 {% if loop.index is divisibleby 2 %}rotate-1{% else %}-rotate-1{% endif %}" />
-                </a>
-            {% endfor %}
-        {% endfor %}
     </div>
 </div>
 

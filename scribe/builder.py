@@ -16,7 +16,12 @@ from scribe.io import get_asset_path
 from scribe.note import InvalidMetadataException, Note, NoteStatus
 
 
-def filter_tag(notes: List[Note], tag_values: Union[str, List[str]]):
+def filter_tag(
+    notes: List[Note],
+    tag_values: Union[str, List[str]],
+    offset: int | None = None,
+    limit: int | None = None,
+):
     """
     Filter for the inclusion/exclusion of some tag. Excluded tags can be prefixed
     with an exclimation point to note that they should be excluded.
@@ -39,6 +44,11 @@ def filter_tag(notes: List[Note], tag_values: Union[str, List[str]]):
             for note in notes
             if len(set(note.metadata.tags) & set(tag_blacklist)) == 0
         ]
+
+    if offset:
+        notes = notes[offset:]
+    if limit:
+        notes = notes[:limit]
 
     return notes    
 
@@ -81,6 +91,11 @@ class WebsiteBuilder:
             notes,
             output_path
         )
+        self.build_paginated(
+            PageDefinition("notes.html", "notes.html"),
+            notes,
+            output_path / "notes",
+        )
         self.build_static(output_path)
 
     def build_notes(self, notes: List[Note], output_path):
@@ -114,6 +129,32 @@ class WebsiteBuilder:
                         header=note.title,
                         metadata=note.metadata,
                         content=note.get_html()
+                    )
+                )
+
+    def build_paginated(
+        self,
+        page: PageDefinition,
+        notes: List[Note],
+        output_path: Path,
+        limit: int = 5,
+    ):
+        """
+        Build paginated items that chunk the notes by a given page limit
+
+        """
+        # Limit to just published notes
+        notes = [note for note in notes if note.metadata.status == NoteStatus.PUBLISHED]
+
+        for i, offset in enumerate(range(0, len(notes), limit)):
+            secho(f"Processing: {page}-offset-{i}")
+            template = self.env.get_template(page.template)
+            with open(output_path / f"{i}.html", "w") as file:
+                file.write(
+                    template.render(
+                        notes=notes,
+                        offset=offset,
+                        limit=limit,
                     )
                 )
 
