@@ -164,7 +164,7 @@ class Note:
         headers = findall(r"(#+)(.*)", first_line)
         headers = sorted(headers, key=lambda x: len(x[0]))
         if not headers:
-            raise ValueError("No header specified.")
+            raise InvalidMetadataException("No header specified.")
         return ParsedPayload(headers[0][1].strip(), [0])
 
     def parse_metadata(self, text: str) -> ParsedPayload:
