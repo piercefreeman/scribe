@@ -1,106 +1,19 @@
-from dataclasses import dataclass
-from itertools import chain
 from pathlib import Path
-from re import escape as re_escape
-from re import finditer, sub
 from shutil import copyfile
 from sys import maxsize
-from typing import Dict, List, Union, Any
-from math import floor
 
 from click import secho
 from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
 from PIL.Image import Resampling
-from collections import defaultdict
-from time import time
 
 from scribe.io import get_asset_path
-from scribe.note import InvalidMetadataException, Note, NoteStatus
-
-SINGLE_PAGE_NOTE_LIMIT = 5
-
-def filter_tag(
-    notes: List[Note],
-    tag_values: Union[str, List[str]],
-    offset: int = 0,
-    limit: int | None = None,
-):
-    """
-    Filter for the inclusion/exclusion of some tag. Excluded tags can be prefixed
-    with an exclimation point to note that they should be excluded.
-    """
-    if isinstance(tag_values, str):
-        tag_values = [tag_values]
-
-    tag_whitelist = {tag for tag in tag_values if not tag.startswith("!")}
-    tag_blacklist = {tag.lstrip("!") for tag in tag_values if tag.startswith("!")}
-
-    if tag_whitelist:
-        notes = [
-            note
-            for note in notes
-            if len(set(note.metadata.tags) & set(tag_whitelist)) > 0
-        ]
-    if tag_blacklist:
-        notes = [
-            note
-            for note in notes
-            if len(set(note.metadata.tags) & set(tag_blacklist)) == 0
-        ]
-
-    if offset:
-        notes = notes[offset:]
-    if limit:
-        notes = notes[:limit]
-
-    return notes    
-
-
-def get_page_direction(
-    notes: List[Note],
-    tag_values: Union[str, List[str]],
-    offset: int = 0,
-    limit: int | None = None,
-) -> list[tuple[str, int]]:
-    """
-    :returns if navigation is possible, returns the int of the page number
-        in the paginated sequence.
-
-    """
-    # Apply the basic filter first (no filtering)
-    notes = filter_tag(notes, tag_values)
-
-    allowed_directions = []
-
-    # Determine if the user can navigate in the direction of interest
-    if offset and offset > 0:
-        previous_offset = max(floor((offset - limit) / limit), 0)
-        allowed_directions.append(("previous", previous_offset))
-    if offset + limit < len(notes):
-        next_offset = floor((offset + limit) / limit)
-        allowed_directions.append(("next", next_offset))
-
-    return allowed_directions
-
-
-def group_by_month(notes: List[Note]) -> dict[str, List[Note]]:
-    notes = sorted(notes, key=lambda note: note.metadata.date, reverse=True)
-
-    by_month = defaultdict(list)
-
-    for note in notes:
-        by_month[f"{note.metadata.date.month} / {note.metadata.date.year}"].append(note)
-
-    return dict(by_month)
-
-
-@dataclass
-class PageDefinition:
-    template: str
-    url: str
-    # Additional page arguments that are passed to the template
-    page_args: dict[str, Any] = None
+from scribe.note import InvalidMetadataException, Note, NoteStatus, Asset
+from dataclasses import asdict, replace
+from scribe.template_utilities import filter_tag, group_by_month
+from scribe.models import PageDefinition, TemplateArguments, PageDirection
+from scribe.constants import SINGLE_PAGE_NOTE_LIMIT
+from scribe.links import local_to_remote_links
 
 
 class WebsiteBuilder:
@@ -111,10 +24,9 @@ class WebsiteBuilder:
         )
 
         self.env.globals["filter_tag"] = filter_tag
-        self.env.globals["get_page_direction"] = get_page_direction
         self.env.globals["group_by_month"] = group_by_month
 
-    def build(self, notes_path: Union[str, Path], output_path: Union[str, Path]):
+    def build(self, notes_path: str | Path, output_path: str | Path):
         notes_path = Path(notes_path).expanduser()
 
         output_path = Path(output_path).expanduser()
@@ -123,51 +35,57 @@ class WebsiteBuilder:
         (output_path / "notes").mkdir(exist_ok=True)
         (output_path / "images").mkdir(exist_ok=True)
 
-        notes = self.get_notes(notes_path)
+        all_notes = self.get_notes(notes_path)
+        published_notes = [note for note in all_notes if note.metadata.status == NoteStatus.PUBLISHED]
 
-        self.build_notes(notes, output_path)
+        # Build all notes that are either in draft form or published. Draft notes require a unique
+        # URL to access them but should be displayed publically
+        self.build_notes(all_notes, output_path)
         self.build_pages(
             [
-                PageDefinition("home.html", "index.html"),
-                PageDefinition("rss.xml", "rss.xml"),
-                PageDefinition("notes.html", "notes.html", page_args=dict(offset=0, limit=SINGLE_PAGE_NOTE_LIMIT)),
-                PageDefinition("travel.html", "travel.html"),
+                PageDefinition(
+                    "home.html",
+                    "index.html",
+                    TemplateArguments(notes=published_notes)
+                ),
+                PageDefinition(
+                    "rss.xml",
+                    "rss.xml",
+                    TemplateArguments(notes=published_notes)
+                ),
+                PageDefinition(
+                    "notes.html",
+                    "notes.html",
+                    TemplateArguments(notes=filter_tag(published_notes, "!travel"), offset=0, limit=SINGLE_PAGE_NOTE_LIMIT)
+                ),
+                PageDefinition(
+                    "travel.html",
+                    "travel.html",
+                    TemplateArguments(notes=filter_tag(published_notes, "travel"))
+                ),
                 PageDefinition("about.html", "about.html"),
             ],
-            notes,
             output_path
         )
-        self.build_paginated(
-            PageDefinition("notes.html", "notes.html"),
-            notes,
+        self.build_pages(
+            [
+                PageDefinition("notes.html", f"{i}.html", argument)
+                for i, argument in enumerate(
+                    self.get_paginated_arguments(
+                        filter_tag(published_notes, "!travel"),
+                        limit=SINGLE_PAGE_NOTE_LIMIT,
+                    )
+                )
+            ],
             output_path / "notes",
-            SINGLE_PAGE_NOTE_LIMIT,
         )
         self.build_static(output_path)
 
-    def build_notes(self, notes: List[Note], output_path: Path):
+    def build_notes(self, notes: list[Note], output_path: Path):
         # Upload the note assets
         for note in notes:
             for asset in note.assets:
-                # Don't process preview files separately, process as part of their main asset package
-                # Compress the assets if we don't already have a compressed version
-                if not asset.local_preview_path.exists():
-                    # The image quality, on a scale from 1 (worst) to 95 (best)
-                    image = Image.open(asset.local_path)
-                    image.thumbnail([1600, maxsize], Resampling.LANCZOS)
-                    #image.save(preview_image_path, "JPEG", quality=95, dpi=(300, 300), subsampling=0)
-                    image.save(asset.local_preview_path, quality=95, dpi=(300, 300))
-
-                # Copy the preview image
-                # Use a relative path to make sure we place it correctly in the output path
-                remote_path = output_path / f"./{asset.remote_preview_path}"
-                if not remote_path.exists():
-                    copyfile(asset.local_preview_path, remote_path)
-
-                # Copy the raw
-                remote_path = output_path / f"./{asset.remote_path}"
-                if not remote_path.exists():
-                    copyfile(asset.local_path, remote_path)
+                self.process_asset(asset, output_path=output_path)
 
         # Build the posts
         post_template = self.env.get_template("post.html")
@@ -181,49 +99,17 @@ class WebsiteBuilder:
                     )
                 )
 
-    def build_paginated(
-        self,
-        page: PageDefinition,
-        notes: List[Note],
-        output_path: Path,
-        limit: int,
-    ):
-        """
-        Build paginated items that chunk the notes by a given page limit
-
-        """
-        # Limit to just published notes
-        # NOTE: This currently might produce a few more pages than we intend, because we are only filtering
-        # for the publishing status and not the valid tags
-        notes = [note for note in notes if note.metadata.status == NoteStatus.PUBLISHED]
-
-        for i, offset in enumerate(range(0, len(notes), limit)):
-            secho(f"Processing: {page}-offset-{i}")
-            template = self.env.get_template(page.template)
-            with open(output_path / f"{i}.html", "w") as file:
-                file.write(
-                    template.render(
-                        notes=notes,
-                        offset=offset,
-                        limit=limit,
-                    )
-                )
-
-    def build_pages(self, pages: List[PageDefinition], notes: List[Note], output_path: Path):
-        # Limit to just published notes
-        notes = [note for note in notes if note.metadata.status == NoteStatus.PUBLISHED]
-
+    def build_pages(self, pages: list[PageDefinition], output_path: Path):
         # Build pages
         for page in pages:
-            secho(f"Processing: {page}")
+            secho(f"Processing: {page.template} -> {page.url}")
+
             template = self.env.get_template(page.template)
+            page_args = page.page_args or TemplateArguments()
+            page_args = self.augment_page_directions(page_args)
+
             with open(output_path / page.url, "w") as file:
-                file.write(
-                    template.render(
-                        notes=notes,
-                        **(page.page_args or {})
-                    )
-                )
+                file.write(template.render(**asdict(page_args)))
 
     def build_rss(self, notes, output_path):
         # Limit to just published notes
@@ -249,7 +135,58 @@ class WebsiteBuilder:
             file_output.parent.mkdir(exist_ok=True)
             copyfile(path, file_output)
 
-    def get_notes(self, notes_path):
+    def get_paginated_arguments(self, notes: list[Note], limit: int):
+        for offset in range(0, len(notes), limit):
+            yield TemplateArguments(
+                notes=notes,
+                limit=limit,
+                offset=offset,
+            )
+
+    def process_asset(self, asset: Asset, output_path: Path):
+        # Don't process preview files separately, process as part of their main asset package
+        # Compress the assets if we don't already have a compressed version
+        if not asset.local_preview_path.exists():
+            # The image quality, on a scale from 1 (worst) to 95 (best)
+            image = Image.open(asset.local_path)
+            image.thumbnail([1600, maxsize], Resampling.LANCZOS)
+            #image.save(preview_image_path, "JPEG", quality=95, dpi=(300, 300), subsampling=0)
+            image.save(asset.local_preview_path, quality=95, dpi=(300, 300))
+
+        # Copy the preview image
+        # Use a relative path to make sure we place it correctly in the output path
+        remote_path = output_path / f"./{asset.remote_preview_path}"
+        if not remote_path.exists():
+            copyfile(asset.local_preview_path, remote_path)
+
+        # Copy the raw
+        remote_path = output_path / f"./{asset.remote_path}"
+        if not remote_path.exists():
+            copyfile(asset.local_path, remote_path)
+
+    def augment_page_directions(self, arguments: TemplateArguments):
+        """
+        Use the metadata in a TemplateArgument to determine if there are additional
+        pages in the sequence.
+
+        """
+        if arguments.offset is None or arguments.limit is None:
+            return arguments
+
+        page_index = arguments.offset // arguments.limit
+        has_next = arguments.offset+arguments.limit < len(arguments.notes)
+        has_previous = page_index > 0
+
+        directions = []
+        directions += ([PageDirection("previous", page_index-1)] if has_previous else [])
+        directions += ([PageDirection("next", page_index+1)] if has_next else [])
+
+        return replace(
+            arguments,
+            directions=directions,
+        )
+
+    def get_notes(self, notes_path: Path):
         notes = []
 
         found_error = False
@@ -272,88 +209,8 @@ class WebsiteBuilder:
         }
 
         for note in notes:
-            note.text = self.local_to_remote_links(note, path_to_remote)
+            note.text = local_to_remote_links(note, path_to_remote)
 
         notes = sorted(notes, key=lambda x: x.metadata.date, reverse=True)
 
         return notes
-
-    def local_to_remote_links(
-        self,
-        note: str,
-        path_to_remote: Dict[str, str],
-    ) -> str:
-        """
-        :param path_to_remote: Specify the mapping from the local path (without path prefix)
-            and the remote location.
-        """
-        note_text = note.text
-
-        # Search for links that haven't been escaped with a \ prior to them
-        markdown_matches = finditer(r"[^\\]\[(.*?)\]\((.+?)\)", note_text)
-        img_matches = finditer(r"<(img).*?src=[\"'](.*?)[\"'].*?/?>", note_text)
-        matches = chain(markdown_matches, img_matches)
-
-        local_links = [
-            match
-            for match in matches
-            if not any(
-                [
-                    "http://" in match.group(2),
-                    "https://" in match.group(2),
-                    "www." in match.group(2),
-                ]
-            )
-        ]
-
-        # Augment the remote path with links to our media files
-        # We choose to use the preview images even if the local paths are pointed
-        # to the full quality versions, since this is how we want to render them on first load
-        path_to_remote = {
-            **path_to_remote,
-            **{
-                Path(asset.local_path).with_suffix("").name: asset.remote_preview_path
-                for asset in note.assets
-            },
-        }
-
-        # [(text, local link, remote link)]
-        to_replace = []
-
-        # Swap the local links
-        for match in local_links:
-            text = match.group(1)
-            local_link = match.group(2)
-            
-            filename = Path(local_link).with_suffix("").name
-            if filename not in path_to_remote:
-                raise ValueError(f"Incorrect link\n Problem Note: {note.filename}\n Link not found locally: {match.group(0)}")
-            remote_path = path_to_remote[filename]
-            to_replace.append((text, local_link, remote_path))
-
-        # The combination of text & link should be enough to uniquely identify link
-        # location and swap with the correct link
-        #
-        # We can't do this exclusively with local_path because some files may
-        # share a common prefix and this will result in incorrect replacement behavior
-        for text, local_link, remote_path in to_replace:
-            search_text = f"[{text}]({local_link})"
-            replace_text = f"[{text}]({remote_path})"
-            note_text = note_text.replace(search_text, replace_text)
-
-        # Same replacement logic for raw images
-        for text, local_link, remote_path in to_replace:
-            note_text = sub(
-                f"<img(.*?)src=[\"']{re_escape(local_link)}[\"'](.*?)/?>",
-                f"<img\\1src=\"{re_escape(remote_path)}\"\\2/>",
-                note_text
-            )
-
-        # Treat escape characters specially, since these are used as bash coloring
-        note_text = note_text.replace("\\x1b", "\x1b")
-        note_text = note_text.replace("\\u001b", "\u001b")
-
-        # Remove other escaped characters unless we are escaping the escape
-        note_text = sub(r"([^\\])\\", r"\1", note_text)
-
-        return note_text

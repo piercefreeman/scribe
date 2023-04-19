@@ -32,10 +32,10 @@ Notes
 
             <!-- Pagination -->
             <div class="flex gap-x-2 pt-4">
-            {% for direction, direction_offset in get_page_direction(notes, "!travel", offset, limit) %}
-                <a class="grow" href="/notes/{{direction_offset}}">
+            {% for direction in directions %}
+                <a class="grow" href="/notes/{{direction.index}}">
                     <div class="bg-blue-300 hover:bg-blue-400 dark:bg-blue-400 dark:hover:bg-blue-300 rounded-sm flex items-center justify-center px-2 py-2 text-white text-xl md:text-sm font-semibold">
-                        {{ direction }}
+                        {{ direction.direction }}
                     </div>
                 </a>
             {% endfor %}
@@ -48,8 +48,8 @@ Notes
                 {% for note in notes %}
                 <div>
                     <a href="/notes/{{note.webpage_path}}">
-                        <div class="py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md">
-                            <div class="text-black-900 dark:text-gray-200 font-semibold text-sm">{{note.title}}</div>
+                        <div class="py-2 px-4 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md">
+                            <div class="text-gray-600 dark:text-gray-300 font-semibold text-sm">{{note.title}}</div>
                         </div>
                     </a>
                 </div>
