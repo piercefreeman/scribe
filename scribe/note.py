@@ -47,7 +47,7 @@ class NoteMetadata(BaseModel):
     class Config:
         extra = "forbid"
 
-    date: str
+    date: str | datetime
     tags: List[str] = []
     #status: NoteStatus = NoteStatus.SCRATCH
     # TODO: Fix the typing here

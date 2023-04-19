@@ -12,6 +12,7 @@ from click import secho
 from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
 from PIL.Image import Resampling
+from collections import defaultdict
 
 from scribe.io import get_asset_path
 from scribe.note import InvalidMetadataException, Note, NoteStatus
@@ -82,6 +83,17 @@ def get_page_direction(
     return allowed_directions
 
 
+def group_by_month(notes: List[Note]) -> dict[str, List[Note]]:
+    notes = sorted(notes, key=lambda note: note.metadata.date, reverse=True)
+
+    by_month = defaultdict(list)
+
+    for note in notes:
+        by_month[f"{note.metadata.date.month} / {note.metadata.date.year}"].append(note)
+
+    return dict(by_month)
+
+
 @dataclass
 class PageDefinition:
     template: str
@@ -99,6 +111,7 @@ class WebsiteBuilder:
 
         self.env.globals["filter_tag"] = filter_tag
         self.env.globals["get_page_direction"] = get_page_direction
+        self.env.globals["group_by_month"] = group_by_month
 
     def build(self, notes_path: Union[str, Path], output_path: Union[str, Path]):
         notes_path = Path(notes_path).expanduser()
