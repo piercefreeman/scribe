@@ -55,8 +55,7 @@ class NoteMetadata(BaseModel):
     date: str | datetime
     tags: List[str] = []
     #status: NoteStatus = NoteStatus.SCRATCH
-    # TODO: Fix the typing here
-    status: Any = NoteStatus.SCRATCH
+    status: NoteStatus | str = NoteStatus.SCRATCH
     subtitle: List[str] = []
 
     # URLs in addition to the system-given URLs
@@ -76,6 +75,9 @@ class NoteMetadata(BaseModel):
 
     @validator("status")
     def validate_status(cls, status):
+        if isinstance(status, NoteStatus):
+            return status
+
         if status == "draft":
             return NoteStatus.DRAFT
         elif status == "publish":
