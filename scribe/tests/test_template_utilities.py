@@ -1,7 +1,10 @@
-import pytest
 import datetime
+
+import pytest
+
 from scribe.note import Note, NoteMetadata
 from scribe.template_utilities import filter_tag, group_by_month
+
 
 @pytest.fixture
 def note_with_tags():

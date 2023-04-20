@@ -1,9 +1,10 @@
-from scribe.note import NoteStatus
-from pathlib import Path
-from scribe.models import TemplateArguments
-from scribe.note import NoteStatus, Note, NoteMetadata
 from datetime import datetime
+from pathlib import Path
+
 from scribe.builder import WebsiteBuilder
+from scribe.models import TemplateArguments
+from scribe.note import Note, NoteMetadata, NoteStatus
+
 
 SCRATCH_NOTE = (
 """
