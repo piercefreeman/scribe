@@ -70,6 +70,8 @@ class NoteMetadata(BaseModel):
 
     @validator("date")
     def validate_date(cls, date):
+        if isinstance(date, datetime):
+            return date
         return date_parser.parse(date)
 
     @validator("status")
@@ -138,27 +140,35 @@ class Note:
     filename: Optional[str] = None
     path: Optional[str] = None
 
-    def __init__(self, path: Union[Path, str], text: str):
-        parsed_title = self.parse_title(text)
-        parsed_metadata = self.parse_metadata(text)
-
-        self.text = self.get_raw_text(text, [parsed_title, parsed_metadata])
-        self.title = parsed_title.result
-        self.metadata = parsed_metadata.result
-
-        self.path = Path(path)
-        self.filename = self.path.with_suffix("").name
-
-        self.simple_content = self.get_simple_content(self.text)
-
+    def __init__(self, text: str | None = None, title: str | None = None, metadata: NoteMetadata | None = None):
+        self.text = text
+        self.title = title
+        self.metadata = metadata
+        
     @classmethod
     def from_file(cls, path: Path):
         with open(path) as file:
             text = file.read().strip()
-            return cls(
+            return cls.from_text(
                 path=path,
                 text=text,
             )
+
+    @classmethod
+    def from_text(cls, path: Path, text: str):
+        obj = Note()
+        parsed_title = obj.parse_title(text)
+        parsed_metadata = obj.parse_metadata(text)
+
+        obj.text = obj.get_raw_text(text, [parsed_title, parsed_metadata])
+        obj.title = parsed_title.result
+        obj.metadata = parsed_metadata.result
+
+        obj.path = Path(path)
+        obj.filename = obj.path.with_suffix("").name
+
+        obj.simple_content = obj.get_simple_content(obj.text)
+        return obj
 
     def parse_title(self, text: str) -> Optional[ParsedPayload]:
         """
