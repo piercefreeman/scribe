@@ -1,9 +1,13 @@
+from os import environ, unlink
 from pathlib import Path
 from shutil import rmtree
-from os import unlink, environ
 
-from click import Path as ClickPath
-from click import command, option, secho
+from click import (
+    Path as ClickPath,
+    command,
+    option,
+    secho,
+)
 
 from scribe.builder import WebsiteBuilder
 

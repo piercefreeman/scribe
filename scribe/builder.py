@@ -1,3 +1,5 @@
+from dataclasses import asdict, replace
+from os import getenv
 from pathlib import Path
 from shutil import copyfile
 from sys import maxsize
@@ -7,14 +9,17 @@ from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
 from PIL.Image import Resampling
 
-from scribe.io import get_asset_path
-from scribe.note import InvalidMetadataException, Note, NoteStatus, Asset
-from dataclasses import asdict, replace
-from scribe.template_utilities import filter_tag, group_by_month
-from scribe.models import PageDefinition, TemplateArguments, PageDirection
 from scribe.constants import SINGLE_PAGE_NOTE_LIMIT
+from scribe.io import get_asset_path
 from scribe.links import local_to_remote_links
-from os import getenv
+from scribe.models import PageDefinition, PageDirection, TemplateArguments
+from scribe.note import (
+    Asset,
+    InvalidMetadataException,
+    Note,
+    NoteStatus,
+)
+from scribe.template_utilities import filter_tag, group_by_month
 
 
 class WebsiteBuilder:

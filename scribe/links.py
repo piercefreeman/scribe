@@ -1,7 +1,9 @@
 from itertools import chain
 from pathlib import Path
 from re import escape as re_escape, finditer, sub
+
 from scribe.note import Note
+
 
 def local_to_remote_links(
     note: Note,
