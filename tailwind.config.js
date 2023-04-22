@@ -33,6 +33,9 @@ module.exports = {
             h2: {
               marginTop: "0px",
             },
+            ul: {
+              marginBottom: "1em"
+            },
             img: {
               borderRadius: theme('rounded'),
             },
