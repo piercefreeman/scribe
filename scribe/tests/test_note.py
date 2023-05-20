@@ -1,6 +1,7 @@
 from re import match
 
-from scribe.note import Note, NoteStatus
+from scribe.metadata import NoteStatus
+from scribe.note import Note
 
 
 def test_title():

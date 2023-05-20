@@ -1,102 +1,21 @@
-from dataclasses import dataclass
-from datetime import datetime
-from enum import Enum, unique
+from logging import warning
 from pathlib import Path
-from re import findall, sub
-from typing import Any, List, Optional
+from re import sub
 
 from bs4 import BeautifulSoup
-from dateutil import parser as date_parser
 from markdown import markdown
 from markdown.extensions.codehilite import CodeHiliteExtension
 from markdown.extensions.fenced_code import FencedCodeExtension
 from markdown.extensions.footnotes import FootnoteExtension
 from markdown.extensions.tables import TableExtension
-from pydantic import BaseModel, ValidationError, validator
-from yaml import safe_load as yaml_loads
 
-
-@unique
-class NoteStatus(Enum):
-    SCRATCH = "SCRATCH"
-    DRAFT = "DRAFT"
-    PUBLISHED = "PUBLISHED"
-
-
-@dataclass
-class ParsedPayload:
-    """
-    Defines a value payload that has been successfully parsed by lexers
-
-    """
-
-    result: Any
-    parsed_lines: List[int]
-
-
-class InvalidMetadataException(Exception):
-    def __init__(self, message):
-        self.message = message
-
-
-class FeaturedPhotoPosition(Enum):
-    LEFT = "left"
-    RIGHT = "right"
-    CENTER = "center"
-
-
-class FeaturedPhotoPayload(BaseModel):
-    path: str
-    cover: FeaturedPhotoPosition = FeaturedPhotoPosition.CENTER
-
-    asset: Optional["Asset"] = None
-
-    class Config:
-        extra = "forbid"
-
-
-class NoteMetadata(BaseModel):
-    """
-    Defines the post metadata that shouldn't be directly visible but drives different
-    elements of the note creation engine.
-
-    """
-
-    date: str | datetime
-    tags: List[str] = []
-    # status: NoteStatus = NoteStatus.SCRATCH
-    status: NoteStatus | str = NoteStatus.SCRATCH
-    subtitle: List[str] = []
-
-    # URLs in addition to the system-given URLs
-    # This is primarily useful to keep backwards compatibility with
-    # posts that change over time
-    # urls: List[str] = []
-
-    # Featured photos are paths to photos that should be featured in photo sections
-    # They can be separate from those that are contained in the body of the post
-    featured_photos: List[str | FeaturedPhotoPayload] = []
-
-    @validator("date")
-    def validate_date(cls, date):
-        if isinstance(date, datetime):
-            return date
-        return date_parser.parse(date)
-
-    @validator("status")
-    def validate_status(cls, status):
-        if isinstance(status, NoteStatus):
-            return status
-
-        if status == "draft":
-            return NoteStatus.DRAFT
-        elif status == "publish":
-            return NoteStatus.PUBLISHED
-        else:
-            raise ValueError(f"Unknown status: `{status}`")
-
-    class Config:
-        extra = "forbid"
+from scribe.metadata import FeaturedPhotoPayload, NoteMetadata
+from scribe.parsers import (
+    get_raw_text,
+    get_simple_content,
+    parse_metadata,
+    parse_title,
+)
 
 
 class Asset:
@@ -154,18 +73,24 @@ class Note:
     # Text-only content with markdown stripped, mostly used for previews
     simple_content: str
 
-    filename: Optional[str] = None
-    path: Optional[str] = None
+    filename: str | None = None
+    path: Path | None = None
 
     def __init__(
         self,
-        text: str | None = None,
-        title: str | None = None,
-        metadata: NoteMetadata | None = None,
+        text: str,
+        title: str,
+        metadata: NoteMetadata,
+        simple_content: str,
+        filename: str | None = None,
+        path: str | Path | None = None,
     ):
         self.text = text
         self.title = title
         self.metadata = metadata
+        self.simple_content = simple_content
+        self.filename = filename
+        self.path = Path(path) if path else None
 
     @classmethod
     def from_file(cls, path: Path):
@@ -178,95 +103,41 @@ class Note:
 
     @classmethod
     def from_text(cls, path: Path, text: str):
-        obj = Note()
-        parsed_title = obj.parse_title(text)
-        parsed_metadata = obj.parse_metadata(text)
+        parsed_title = parse_title(text)
+        parsed_metadata = parse_metadata(text)
 
-        obj.text = obj.get_raw_text(text, [parsed_title, parsed_metadata])
-        obj.title = parsed_title.result
-        obj.metadata = parsed_metadata.result
-
-        obj.path = Path(path)
-        obj.filename = obj.path.with_suffix("").name
-
-        obj.simple_content = obj.get_simple_content(obj.text)
-        return obj
-
-    def parse_title(self, text: str) -> Optional[ParsedPayload]:
-        """
-        Determine if the first line is a header
-
-        """
-        first_line = text.strip().split("\n")[0]
-        headers = findall(r"(#+)(.*)", first_line)
-        headers = sorted(headers, key=lambda x: len(x[0]))
-        if not headers:
-            raise InvalidMetadataException("No header specified.")
-        return ParsedPayload(headers[0][1].strip(), [0])
-
-    def parse_metadata(self, text: str) -> ParsedPayload:
-        metadata_string = ""
-        meta_started = False
-        parsed_lines = []
-        for i, line in enumerate(text.split("\n")):
-            # Start read with the meta: tag indication that we have
-            # started to declare the dictionary, end it otherwise.
-            if line.strip() == "meta:":
-                meta_started = True
-            if line.strip() == "":
-                meta_started = False
-            if meta_started:
-                metadata_string += f"{line}\n"
-                parsed_lines.append(i)
-
-        if not metadata_string:
-            # If users haven't specified metadata, assume it is a scratch note
-            return ParsedPayload(NoteMetadata(date=datetime.now().isoformat()), [])
-
-        try:
-            metadata = NoteMetadata.parse_obj(yaml_loads(metadata_string)["meta"])
-        except ValidationError as e:
-            raise InvalidMetadataException(str(e))
-
-        return ParsedPayload(metadata, parsed_lines)
-
-    def get_raw_text(self, text, parsed_payloads: List[ParsedPayload]) -> str:
-        ignore_lines = {
-            line for parsed in parsed_payloads for line in parsed.parsed_lines
-        }
-
-        text = "\n".join(
-            [line for i, line in enumerate(text.split("\n")) if i not in ignore_lines]
-        ).strip()
-
-        # Normalize image patterns to ![]()
-        # Different markdown implementations have different patterns for this
-        text = sub(r"!\[\[(.*)\]\]", r"![](\1)", text)
-
-        return text
-
-    def get_simple_content(self, text: str):
-        html = markdown(text.split("\n")[0])
-        content = "".join(BeautifulSoup(html, "html.parser").findAll(text=True))
-        return sub(r"\s", " ", content)
+        return cls(
+            text=get_raw_text(text, [parsed_title, parsed_metadata]),
+            title=parsed_title.result,
+            metadata=parsed_metadata.result,
+            path=path,
+            filename=path.with_suffix("").name,
+            simple_content=get_simple_content(text),
+        )
 
     @property
-    def assets(self) -> List[Asset]:
+    def assets(self) -> list[Asset]:
         """
         Get a list of the raw assets that are within this parent folder. These might or
         might not be referenced in the body of the article.
 
         """
+        # Text only notes don't have assets
+        if not self.path:
+            warning(f"Note {self} has no path; cannot fetch assets.")
+            return []
+
         suffix_whitelist = {".png", ".jpeg", ".jpg"}
         assets = []
-        for path in Path(self.path).parent.iterdir():
+        for path in self.path.parent.iterdir():
             if path.suffix in suffix_whitelist:
                 assets.append(Asset(self, path))
+
         # De-duplicate the full images and previews, which are also found by our glob search
         return list(set(assets))
 
     @property
-    def featured_assets(self) -> List[FeaturedPhotoPayload]:
+    def featured_assets(self) -> list[FeaturedPhotoPayload]:
         """
         Featured assets are located on photo collages. This function
         parses the user payloads, which can be either a raw string or a payload
@@ -275,6 +146,12 @@ class Note:
         It returns a normalzied FeaturedPhotoPayload with an asset attached.
 
         """
+        # While technically the featured assets appear within the text, we can't get the absolute
+        # path to the images without the note also having a path
+        if not self.path:
+            warning(f"Note {self} has no path; cannot fetch featured assets.")
+            return []
+
         featured_photos: list[FeaturedPhotoPayload] = []
         for photo_definition in self.metadata.featured_photos:
             featured_payload: FeaturedPhotoPayload | None = None
@@ -293,7 +170,6 @@ class Note:
             featured_payload.asset = Asset(self, full_path)
             featured_photos.append(featured_payload)
 
-        # De-duplicate the full images and previews, which are also found by our glob search
         return featured_photos
 
     @property

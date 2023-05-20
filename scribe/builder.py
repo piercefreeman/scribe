@@ -12,14 +12,10 @@ from PIL.Image import Resampling
 from scribe.constants import SINGLE_PAGE_NOTE_LIMIT
 from scribe.io import get_asset_path
 from scribe.links import local_to_remote_links
+from scribe.metadata import FeaturedPhotoPosition, NoteStatus
 from scribe.models import PageDefinition, PageDirection, TemplateArguments
-from scribe.note import (
-    Asset,
-    FeaturedPhotoPosition,
-    InvalidMetadataException,
-    Note,
-    NoteStatus,
-)
+from scribe.note import Asset, Note
+from scribe.parsers import InvalidMetadataException
 from scribe.template_utilities import filter_tag, group_by_month
 
 
@@ -165,7 +161,7 @@ class WebsiteBuilder:
         if not asset.local_preview_path.exists():
             # The image quality, on a scale from 1 (worst) to 95 (best)
             image = Image.open(asset.local_path)
-            image.thumbnail([1600, maxsize], Resampling.LANCZOS)
+            image.thumbnail((1600, maxsize), Resampling.LANCZOS)
             # image.save(preview_image_path, "JPEG", quality=95, dpi=(300, 300), subsampling=0)
             image.save(asset.local_preview_path, quality=95, dpi=(300, 300))
 
@@ -189,8 +185,10 @@ class WebsiteBuilder:
         if arguments.offset is None or arguments.limit is None:
             return arguments
 
+        note_count = len(arguments.notes) if arguments.notes else 0
+
         page_index = arguments.offset // arguments.limit
-        has_next = arguments.offset + arguments.limit < len(arguments.notes)
+        has_next = arguments.offset + arguments.limit < note_count
         has_previous = page_index > 0
 
         directions = []
