@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum, unique
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from dateutil import parser as date_parser
 from pydantic import BaseModel, validator
@@ -28,7 +28,7 @@ class FeaturedPhotoPayload(BaseModel):
     path: str
     cover: FeaturedPhotoPosition = FeaturedPhotoPosition.CENTER
 
-    asset: "Asset" | None = None
+    asset: Optional["Asset"] = None
 
     class Config:
         extra = "forbid"

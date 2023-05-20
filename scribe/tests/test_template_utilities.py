@@ -9,23 +9,48 @@ from scribe.template_utilities import filter_tag, group_by_month
 @pytest.fixture
 def note_with_tags():
     metadata = NoteMetadata(tags=["tag1", "tag2"], date=datetime.datetime(2022, 1, 1))
-    return Note("test note", metadata=metadata)
+    return Note(
+        "test note",
+        metadata=metadata,
+        title="test title",
+        simple_content="test content",
+    )
 
 
 @pytest.fixture
 def note_with_date():
     metadata = NoteMetadata(date=datetime.datetime(2022, 1, 1))
-    return Note("test note", metadata=metadata)
+    return Note(
+        "test note",
+        metadata=metadata,
+        title="test title",
+        simple_content="test content",
+    )
 
 
 @pytest.fixture
 def multiple_notes():
     metadata1 = NoteMetadata(tags=["tag1", "tag2"], date=datetime.datetime(2022, 2, 1))
-    note1 = Note("test note 1", metadata=metadata1)
+    note1 = Note(
+        "test note 1",
+        title="test title",
+        simple_content="test content",
+        metadata=metadata1,
+    )
     metadata2 = NoteMetadata(tags=["tag2", "tag3"], date=datetime.datetime(2022, 1, 1))
-    note2 = Note("test note 2", metadata=metadata2)
+    note2 = Note(
+        "test note 2",
+        title="test title",
+        simple_content="test content",
+        metadata=metadata2,
+    )
     metadata3 = NoteMetadata(tags=["tag3", "tag4"], date=datetime.datetime(2022, 1, 3))
-    note3 = Note("test note 3", metadata=metadata3)
+    note3 = Note(
+        "test note 3",
+        title="test title",
+        simple_content="test content",
+        metadata=metadata3,
+    )
     return [note1, note2, note3]
 
 

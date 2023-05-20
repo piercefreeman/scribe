@@ -102,16 +102,18 @@ class Note:
             )
 
     @classmethod
-    def from_text(cls, path: Path, text: str):
+    def from_text(cls, path: Path | str, text: str):
         parsed_title = parse_title(text)
         parsed_metadata = parse_metadata(text)
+
+        path_obj = Path(path)
 
         return cls(
             text=get_raw_text(text, [parsed_title, parsed_metadata]),
             title=parsed_title.result,
             metadata=parsed_metadata.result,
-            path=path,
-            filename=path.with_suffix("").name,
+            path=path_obj,
+            filename=path_obj.with_suffix("").name,
             simple_content=get_simple_content(text),
         )
 
