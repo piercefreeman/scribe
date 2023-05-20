@@ -18,6 +18,7 @@ from scribe.note import (
     InvalidMetadataException,
     Note,
     NoteStatus,
+    FeaturedPhotoPosition,
 )
 from scribe.template_utilities import filter_tag, group_by_month
 
@@ -31,6 +32,7 @@ class WebsiteBuilder:
 
         self.env.globals["filter_tag"] = filter_tag
         self.env.globals["group_by_month"] = group_by_month
+        self.env.globals["FeaturedPhotoPosition"] = FeaturedPhotoPosition
 
     def build(self, notes_path: str | Path, output_path: str | Path):
         notes_path = Path(notes_path).expanduser()

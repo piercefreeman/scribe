@@ -16,9 +16,9 @@ Travel
         <div class="col-span-3 divide-y divide-slate-200 dark:divide-slate-800">
             <div class="mt-12 grid max-w-5xl mx-auto sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4 items-center justify-center px-4">
                 {% for note in filter_tag(notes, "travel") %}
-                    {% for asset in note.featured_assets %}
+                    {% for definition in note.featured_assets %}
                         <a href="/notes/{{note.webpage_path}}">
-                            <img src="{{asset.remote_preview_path}}" class="rounded-lg object-cover h-56 md:h-96 w-96 transition {% if loop.index is divisibleby 2 %}rotate-1{% else %}-rotate-1{% endif %} hover:rotate-0 hover:shadow-lg" />
+                            <img src="{{definition.asset.remote_preview_path}}" class="rounded-lg object-cover h-56 md:h-96 w-96 transition {% if loop.index is divisibleby 2 %}rotate-1{% else %}-rotate-1{% endif %} {% if definition.cover == FeaturedPhotoPosition.CENTER %} object-center {% elif definition.cover == FeaturedPhotoPosition.LEFT %} object-left {% elif definition.cover == FeaturedPhotoPosition.RIGHT %} object-right {% endif %} hover:rotate-0 hover:shadow-lg" />
                         </a>
                     {% endfor %}
                 {% endfor %}

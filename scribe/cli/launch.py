@@ -29,7 +29,7 @@ class NotesChangedEventHandler(FileSystemEventHandler):
         if str(self.scribe_path) in event.src_path:
             secho("website code changed", fg="yellow")
         elif str(self.note_path) in event.src_path and "static" not in event.src_path:
-            secho("note changed: `{event.src_path}`", fg="yellow")
+            secho(f"note changed: `{event.src_path}`", fg="yellow")
         else:
             return
 

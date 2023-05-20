@@ -8,6 +8,7 @@ from typing import (
     List,
     Optional,
     Union,
+    Tuple,
 )
 
 from bs4 import BeautifulSoup
@@ -42,6 +43,19 @@ class InvalidMetadataException(Exception):
     def __init__(self, message):
         self.message = message
 
+class FeaturedPhotoPosition(Enum):
+    LEFT = "left"
+    RIGHT = "right"
+    CENTER = "center"
+
+class FeaturedPhotoPayload(BaseModel):
+    path: str
+    cover: FeaturedPhotoPosition = FeaturedPhotoPosition.CENTER
+
+    asset: Optional["Asset"] = None
+
+    class Config:
+        extra = "forbid"
 
 class NoteMetadata(BaseModel):
     """
@@ -49,9 +63,6 @@ class NoteMetadata(BaseModel):
     elements of the note creation engine.
 
     """
-    class Config:
-        extra = "forbid"
-
     date: str | datetime
     tags: List[str] = []
     #status: NoteStatus = NoteStatus.SCRATCH
@@ -65,7 +76,7 @@ class NoteMetadata(BaseModel):
 
     # Featured photos are paths to photos that should be featured in photo sections
     # They can be separate from those that are contained in the body of the post
-    featured_photos: List[str] = []
+    featured_photos: List[str | FeaturedPhotoPayload] = []
 
     @validator("date")
     def validate_date(cls, date):
@@ -84,6 +95,9 @@ class NoteMetadata(BaseModel):
             return NoteStatus.PUBLISHED
         else:
             raise ValueError(f"Unknown status: `{status}`")
+
+    class Config:
+        extra = "forbid"
 
 
 class Asset:
@@ -252,18 +266,35 @@ class Note:
         return list(set(assets))
 
     @property
-    def featured_assets(self) -> List[Asset]:
+    def featured_assets(self) -> List[FeaturedPhotoPayload]:
         """
-        List of assets that should be featured on photo collages.
+        Featured assets are located on photo collages. This function
+        parses the user payloads, which can be either a raw string or a payload
+        that customizes more metadata about how the photo is featured.
+
+        It returns a normalzied FeaturedPhotoPayload with an asset attached.
+
         """
-        assets = []
-        for relative_path in self.metadata.featured_photos:
-            full_path = Path(self.path).parent / relative_path
+        featured_photos : list[FeaturedPhotoPayload] = []
+        for photo_definition in self.metadata.featured_photos:
+            featured_payload : FeaturedPhotoPayload | None = None
+
+            if isinstance(photo_definition, str):
+                featured_payload = FeaturedPhotoPayload(path=photo_definition)
+            elif isinstance(photo_definition, FeaturedPhotoPayload):
+                featured_payload = photo_definition
+            else:
+                raise ValueError(f"Unknown payload type: {type(photo_definition)}")
+
+            full_path = Path(self.path).parent / featured_payload.path
             if not full_path.exists():
                 raise ValueError(f"Unknown path: {full_path}")
-            assets.append(Asset(self, full_path))
+
+            featured_payload.asset = Asset(self, full_path)
+            featured_photos.append(featured_payload)
+
         # De-duplicate the full images and previews, which are also found by our glob search
-        return assets
+        return featured_photos
 
     @property
     def webpage_path(self) -> str:
