@@ -10,6 +10,7 @@ from scribe.builder import WebsiteBuilder
 def builder():
     return WebsiteBuilder()
 
+
 @pytest.fixture()
 def note_directory():
     with TemporaryDirectory() as directory:

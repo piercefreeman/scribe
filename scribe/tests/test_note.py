@@ -19,29 +19,30 @@ def test_webpage_path():
     Some content
     """
 
-    assert Note.from_text(text=text, path="/fake-path.md").webpage_path == "valid-header-123"
+    assert (
+        Note.from_text(text=text, path="/fake-path.md").webpage_path
+        == "valid-header-123"
+    )
 
     text = """
     # Partially || Invalid Header
     Some content
     """
 
-    assert Note.from_text(text=text, path="/fake-path.md").webpage_path == "partially-invalid-header"
+    assert (
+        Note.from_text(text=text, path="/fake-path.md").webpage_path
+        == "partially-invalid-header"
+    )
 
 
 def test_get_markdown():
-    text = (
-        "# Header\n"
-        "## Subheader\n"
-        "Content\n"
-    )
+    text = "# Header\n" "## Subheader\n" "Content\n"
 
-    find_pattern = (
-        "<h2>Subheader</h2>\n"
-        "<p>Content</p>"
-    )
+    find_pattern = "<h2>Subheader</h2>\n" "<p>Content</p>"
 
-    assert match(find_pattern, Note.from_text(text=text, path="/fake-path.md").get_html())
+    assert match(
+        find_pattern, Note.from_text(text=text, path="/fake-path.md").get_html()
+    )
 
 
 def test_published():
@@ -50,7 +51,10 @@ def test_published():
     Some content
     """
 
-    assert Note.from_text(text=text, path="/fake-path.md").metadata.status == NoteStatus.SCRATCH
+    assert (
+        Note.from_text(text=text, path="/fake-path.md").metadata.status
+        == NoteStatus.SCRATCH
+    )
 
     text = """
     # Header
@@ -62,4 +66,7 @@ def test_published():
     Some content
     """
 
-    assert Note.from_text(text=text, path="/fake-path.md").metadata.status == NoteStatus.PUBLISHED
+    assert (
+        Note.from_text(text=text, path="/fake-path.md").metadata.status
+        == NoteStatus.PUBLISHED
+    )

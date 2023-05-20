@@ -40,7 +40,12 @@ class NotesChangedEventHandler(FileSystemEventHandler):
         if self.builder_process:
             self.builder_process.terminate()
 
-        self.builder_process = Process(target=system, args=[f"build-notes --notes {self.note_path} --output {self.output_path} --env {self.env}"])
+        self.builder_process = Process(
+            target=system,
+            args=[
+                f"build-notes --notes {self.note_path} --output {self.output_path} --env {self.env}"
+            ],
+        )
         self.builder_process.start()
 
 
@@ -55,7 +60,9 @@ def main(notes: str, output: str, port: int, env: str):
     runserver_process.start()
 
     # Launch the styling refresh system
-    style_process = Process(target=system, args=[f"cd {get_asset_path('../')} && npm run styles-watch"])
+    style_process = Process(
+        target=system, args=[f"cd {get_asset_path('../')} && npm run styles-watch"]
+    )
     style_process.start()
 
     event_handler = NotesChangedEventHandler(notes, output, env)

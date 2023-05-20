@@ -9,8 +9,10 @@ class PageDirection:
     Indicates that a page has additional content on a subsequent page
 
     """
+
     direction: str
     index: int
+
 
 @dataclass
 class TemplateArguments:
@@ -20,6 +22,7 @@ class TemplateArguments:
     page definitions with separate attributes.
 
     """
+
     offset: int | None = None
     limit: int | None = None
     notes: list[Note] | None = None

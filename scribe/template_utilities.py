@@ -41,7 +41,7 @@ def filter_tag(
     if limit:
         notes = notes[:limit]
 
-    return notes    
+    return notes
 
 
 def group_by_month(notes: list[Note]) -> dict[str, list[Note]]:

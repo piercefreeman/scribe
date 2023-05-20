@@ -3,13 +3,7 @@ from datetime import datetime
 from enum import Enum, unique
 from pathlib import Path
 from re import findall, sub
-from typing import (
-    Any,
-    List,
-    Optional,
-    Union,
-    Tuple,
-)
+from typing import Any, List, Optional
 
 from bs4 import BeautifulSoup
 from dateutil import parser as date_parser
@@ -35,6 +29,7 @@ class ParsedPayload:
     Defines a value payload that has been successfully parsed by lexers
 
     """
+
     result: Any
     parsed_lines: List[int]
 
@@ -43,10 +38,12 @@ class InvalidMetadataException(Exception):
     def __init__(self, message):
         self.message = message
 
+
 class FeaturedPhotoPosition(Enum):
     LEFT = "left"
     RIGHT = "right"
     CENTER = "center"
+
 
 class FeaturedPhotoPayload(BaseModel):
     path: str
@@ -57,15 +54,17 @@ class FeaturedPhotoPayload(BaseModel):
     class Config:
         extra = "forbid"
 
+
 class NoteMetadata(BaseModel):
     """
     Defines the post metadata that shouldn't be directly visible but drives different
     elements of the note creation engine.
 
     """
+
     date: str | datetime
     tags: List[str] = []
-    #status: NoteStatus = NoteStatus.SCRATCH
+    # status: NoteStatus = NoteStatus.SCRATCH
     status: NoteStatus | str = NoteStatus.SCRATCH
     subtitle: List[str] = []
 
@@ -107,6 +106,7 @@ class Asset:
     to their full filepath, following our assumed path patterns.
 
     """
+
     def __init__(self, note: "Note", path: Path):
         self.root_path = note.webpage_path
         self.path = Path(str(path).replace("-preview", "")).absolute()
@@ -145,6 +145,7 @@ class Note:
     a python object that's able to be inserted into the template engine.
 
     """
+
     text: str
 
     title: str
@@ -156,11 +157,16 @@ class Note:
     filename: Optional[str] = None
     path: Optional[str] = None
 
-    def __init__(self, text: str | None = None, title: str | None = None, metadata: NoteMetadata | None = None):
+    def __init__(
+        self,
+        text: str | None = None,
+        title: str | None = None,
+        metadata: NoteMetadata | None = None,
+    ):
         self.text = text
         self.title = title
         self.metadata = metadata
-        
+
     @classmethod
     def from_file(cls, path: Path):
         with open(path) as file:
@@ -226,17 +232,11 @@ class Note:
 
     def get_raw_text(self, text, parsed_payloads: List[ParsedPayload]) -> str:
         ignore_lines = {
-            line
-            for parsed in parsed_payloads
-            for line in parsed.parsed_lines
+            line for parsed in parsed_payloads for line in parsed.parsed_lines
         }
 
         text = "\n".join(
-            [
-                line
-                for i, line in enumerate(text.split("\n"))
-                if i not in ignore_lines
-            ]
+            [line for i, line in enumerate(text.split("\n")) if i not in ignore_lines]
         ).strip()
 
         # Normalize image patterns to ![]()
@@ -247,7 +247,7 @@ class Note:
 
     def get_simple_content(self, text: str):
         html = markdown(text.split("\n")[0])
-        content = ''.join(BeautifulSoup(html, "html.parser").findAll(text=True))
+        content = "".join(BeautifulSoup(html, "html.parser").findAll(text=True))
         return sub(r"\s", " ", content)
 
     @property
@@ -275,9 +275,9 @@ class Note:
         It returns a normalzied FeaturedPhotoPayload with an asset attached.
 
         """
-        featured_photos : list[FeaturedPhotoPayload] = []
+        featured_photos: list[FeaturedPhotoPayload] = []
         for photo_definition in self.metadata.featured_photos:
-            featured_payload : FeaturedPhotoPayload | None = None
+            featured_payload: FeaturedPhotoPayload | None = None
 
             if isinstance(photo_definition, str):
                 featured_payload = FeaturedPhotoPayload(path=photo_definition)
@@ -321,7 +321,7 @@ class Note:
                 FencedCodeExtension(),
                 FootnoteExtension(BACKLINK_TEXT="↢"),
                 TableExtension(),
-            ]
+            ],
         )
 
         content = BeautifulSoup(html, "html.parser")

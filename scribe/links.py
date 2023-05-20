@@ -55,10 +55,12 @@ def local_to_remote_links(
     for match in local_links:
         text = match.group(1)
         local_link = match.group(2)
-        
+
         filename = Path(local_link).with_suffix("").name
         if filename not in path_to_remote:
-            raise ValueError(f"Incorrect link\n Problem Note: {note.filename}\n Link not found locally: {match.group(0)}")
+            raise ValueError(
+                f"Incorrect link\n Problem Note: {note.filename}\n Link not found locally: {match.group(0)}"
+            )
         remote_path = path_to_remote[filename]
         to_replace.append((text, local_link, remote_path))
 
@@ -76,8 +78,8 @@ def local_to_remote_links(
     for text, local_link, remote_path in to_replace:
         note_text = sub(
             f"<img(.*?)src=[\"']{re_escape(local_link)}[\"'](.*?)/?>",
-            f"<img\\1src=\"{re_escape(remote_path)}\"\\2/>",
-            note_text
+            f'<img\\1src="{re_escape(remote_path)}"\\2/>',
+            note_text,
         )
 
     # Treat escape characters specially, since these are used as bash coloring

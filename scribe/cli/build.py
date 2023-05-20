@@ -44,5 +44,5 @@ def main(notes: str, output: str, clean: bool, env: str):
             secho("Removing previous html output...", fg="yellow")
             for item in Path(output).glob("**/*.html"):
                 unlink(item)
-                
+
     build(notes, output)

@@ -15,10 +15,10 @@ from scribe.links import local_to_remote_links
 from scribe.models import PageDefinition, PageDirection, TemplateArguments
 from scribe.note import (
     Asset,
+    FeaturedPhotoPosition,
     InvalidMetadataException,
     Note,
     NoteStatus,
-    FeaturedPhotoPosition,
 )
 from scribe.template_utilities import filter_tag, group_by_month
 
@@ -26,8 +26,7 @@ from scribe.template_utilities import filter_tag, group_by_month
 class WebsiteBuilder:
     def __init__(self):
         self.env = Environment(
-            loader=PackageLoader(__name__.split(".")[0]),
-            autoescape=select_autoescape()
+            loader=PackageLoader(__name__.split(".")[0]), autoescape=select_autoescape()
         )
 
         self.env.globals["filter_tag"] = filter_tag
@@ -49,7 +48,11 @@ class WebsiteBuilder:
         if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
             published_notes = all_notes
         else:
-            published_notes = [note for note in all_notes if note.metadata.status == NoteStatus.PUBLISHED]
+            published_notes = [
+                note
+                for note in all_notes
+                if note.metadata.status == NoteStatus.PUBLISHED
+            ]
 
         # Build all notes that are either in draft form or published. Draft notes require a unique
         # URL to access them but should be displayed publically
@@ -57,28 +60,28 @@ class WebsiteBuilder:
         self.build_pages(
             [
                 PageDefinition(
-                    "home.html",
-                    "index.html",
-                    TemplateArguments(notes=published_notes)
+                    "home.html", "index.html", TemplateArguments(notes=published_notes)
                 ),
                 PageDefinition(
-                    "rss.xml",
-                    "rss.xml",
-                    TemplateArguments(notes=published_notes)
+                    "rss.xml", "rss.xml", TemplateArguments(notes=published_notes)
                 ),
                 PageDefinition(
                     "notes.html",
                     "notes.html",
-                    TemplateArguments(notes=filter_tag(published_notes, "!travel"), offset=0, limit=SINGLE_PAGE_NOTE_LIMIT)
+                    TemplateArguments(
+                        notes=filter_tag(published_notes, "!travel"),
+                        offset=0,
+                        limit=SINGLE_PAGE_NOTE_LIMIT,
+                    ),
                 ),
                 PageDefinition(
                     "travel.html",
                     "travel.html",
-                    TemplateArguments(notes=filter_tag(published_notes, "travel"))
+                    TemplateArguments(notes=filter_tag(published_notes, "travel")),
                 ),
                 PageDefinition("about.html", "about.html"),
             ],
-            output_path
+            output_path,
         )
         self.build_pages(
             [
@@ -108,7 +111,7 @@ class WebsiteBuilder:
                     post_template.render(
                         header=note.title,
                         metadata=note.metadata,
-                        content=note.get_html()
+                        content=note.get_html(),
                     )
                 )
 
@@ -163,7 +166,7 @@ class WebsiteBuilder:
             # The image quality, on a scale from 1 (worst) to 95 (best)
             image = Image.open(asset.local_path)
             image.thumbnail([1600, maxsize], Resampling.LANCZOS)
-            #image.save(preview_image_path, "JPEG", quality=95, dpi=(300, 300), subsampling=0)
+            # image.save(preview_image_path, "JPEG", quality=95, dpi=(300, 300), subsampling=0)
             image.save(asset.local_preview_path, quality=95, dpi=(300, 300))
 
         # Copy the preview image
@@ -187,12 +190,14 @@ class WebsiteBuilder:
             return arguments
 
         page_index = arguments.offset // arguments.limit
-        has_next = arguments.offset+arguments.limit < len(arguments.notes)
+        has_next = arguments.offset + arguments.limit < len(arguments.notes)
         has_previous = page_index > 0
 
         directions = []
-        directions += ([PageDirection("previous", page_index-1)] if has_previous else [])
-        directions += ([PageDirection("next", page_index+1)] if has_next else [])
+        directions += (
+            [PageDirection("previous", page_index - 1)] if has_previous else []
+        )
+        directions += [PageDirection("next", page_index + 1)] if has_next else []
 
         return replace(
             arguments,
@@ -217,8 +222,7 @@ class WebsiteBuilder:
             exit()
 
         path_to_remote = {
-            note.filename: f"/notes/{note.webpage_path}"
-            for note in notes
+            note.filename: f"/notes/{note.webpage_path}" for note in notes
         }
 
         for note in notes:
