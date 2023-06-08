@@ -1,5 +1,6 @@
 from multiprocessing import Process
-from os import system
+from os import environ, system
+from pathlib import Path
 from time import sleep
 
 from click import (
@@ -59,9 +60,12 @@ def main(notes: str, output: str, port: int, env: str):
     runserver_process = Process(target=runserver, args=[output, port])
     runserver_process.start()
 
+    environ["MARKDOWN_PATH"] = str(Path(notes).expanduser().absolute())
+
     # Launch the styling refresh system
     style_process = Process(
-        target=system, args=[f"cd {get_asset_path('../')} && npm run styles-watch"]
+        target=system,
+        args=[f"cd {get_asset_path('../')} && npm run styles-watch"],
     )
     style_process.start()
 

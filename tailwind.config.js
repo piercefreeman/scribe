@@ -1,10 +1,14 @@
+const markdownPath = process.env.MARKDOWN_PATH || null;
+
+const content = [
+  "./scribe/templates/*.{html,js}",
+  ...(markdownPath ? [`${markdownPath}/**/*.md`] : [])
+]
+
+console.log("Building styles based on these files: ", content.join(" | "))
+
 module.exports = {
-  content: [
-    "./scribe/components/*.{html,js}",
-    "./scribe/templates/*.{html,js}",
-    // include markdown docs that might have some custom html markup within them
-    "../public/**/*.md"
-  ],
+  content,
   safelist: [
     "Color-Black",
     "-Color-Red",
