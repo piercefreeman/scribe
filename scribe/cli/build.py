@@ -1,3 +1,4 @@
+import subprocess
 from os import environ, unlink
 from pathlib import Path
 from shutil import rmtree
@@ -10,6 +11,7 @@ from click import (
 )
 
 from scribe.builder import WebsiteBuilder
+from scribe.io import get_asset_path
 
 
 def build(notes_path, output_path):
@@ -29,6 +31,12 @@ def build(notes_path, output_path):
 def main(notes: str, output: str, clean: bool, env: str):
     environ["SCRIBE_ENVIRONMENT"] = env
     secho(f"Environment: {env}")
+
+    environ["MARKDOWN_PATH"] = str(Path(notes).expanduser().absolute())
+
+    # Build the styles
+    command = f"cd {get_asset_path('../')} && npm run styles-build"
+    subprocess.run(command, shell=True)
 
     if clean:
         if Path(output).exists():
