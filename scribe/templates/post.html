@@ -11,58 +11,128 @@
 
 <div class="rounded-sm"></div>
 
-<div class="max-w-3xl mx-auto mt-6 pb-8">
-    <div class="px-4">
-        <article>
-            <div>
-                <h1 class="block text-3xl text-center leading-8 font-medium tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">{{header}}</h1>
-            </div>
-            <div class="mt-2 text-lg text-gray-500 text-center">
-                <h6>{{metadata.date.strftime("%B %-d, %Y")}}</h6>
-            </div>
-            <div class="article-large mt-4 prose prose-img:m-0 dark:prose-invert max-w-none">
-                {{content|safe}}
-            </div>
-        </article>
-
-        <div class="mt-8">
-            <div class="rounded-lg bg-gray-900 dark:bg-gray-200 px-6 py-8">
-                <div class="text-base text-gray-200 dark:text-gray-900">
-                    <h2 class="text-3xl font-bold tracking-tight">Stay in Touch</h2>
-                    <p class="mt-4">I write mostly about engineering, machine learning, and company building. If you want to get updated about longer essays, subscribe here.</p>                    
-                    <p class="mt-4">I hate spam so I keep these infrequent - once or twice a month, maximum.</p>
-                </div>
-    
-                <form id="newsletter-form">
-                    <div class="mt-4 flex gap-x-4">
-                        <label htmlFor="email-address" class="sr-only">
-                          Email address
-                        </label>
-                        <input
-                          id="email-address"
-                          name="email_address"
-                          type="email"
-                          autoComplete="email"
-                          required
-                          class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-white dark:text-gray-900 shadow-sm ring-1 ring-inset ring-white/10 dark:ring-inset dark:ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6"
-                          placeholder="Type your email..."
-                        />
-                        <button
-                          type="submit"
-                          class="flex-none rounded-md bg-indigo-500 py-2.5 px-3.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                        >
-                          Subscribe
-                        </button>
-                      </div>                        
-                </form>
-
-                <div id="form-result" class="mt-4 hidden">
-                    <div id="form-success" class="text-green-600">hi</div>
-                    <div id="form-error" class="text-red-600"></div>
-                </div>
+<div class="max-w-5xl mx-auto mt-6 pb-8 px-8 lg:px-0">
+    <div>
+        <div class="pr-24">
+            <article>
+            <h1 class="block font-medium tracking-normal bg-indigo-500 text-white text-7xl py-4 px-6 -rotate-1 rounded">{{header}}</h1>
+            </article>
         </div>
     </div>
+    <div class="grid grid-cols-12">
+        <div class="col-span-12 lg:col-span-9 px-4" id="content-raw">
+            <article>
+                <div class="mt-4 text-lg text-gray-300">
+                    <h6># {{metadata.date.strftime("%B %-d, %Y")}}</h6>
+                </div>
+                <div class="article-large mt-4 prose prose-img:m-0 dark:prose-invert max-w-none">
+                    {{content|safe}}
+                </div>
+            </article>
+
+            <div class="mt-8">
+                <div class="rounded-lg bg-gray-900 dark:bg-gray-200 px-6 py-8">
+                    <div class="text-base text-gray-200 dark:text-gray-900">
+                        <h2 class="text-3xl font-bold tracking-tight">Stay in Touch</h2>
+                        <p class="mt-4">I write mostly about engineering, machine learning, and company building. If you want to get updated about longer essays, subscribe here.</p>                    
+                        <p class="mt-4">I hate spam so I keep these infrequent - once or twice a month, maximum.</p>
+                    </div>
+        
+                    <form id="newsletter-form">
+                        <div class="mt-4 flex gap-x-4">
+                            <label htmlFor="email-address" class="sr-only">
+                            Email address
+                            </label>
+                            <input
+                            id="email-address"
+                            name="email_address"
+                            type="email"
+                            autoComplete="email"
+                            required
+                            class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-white dark:text-gray-900 shadow-sm ring-1 ring-inset ring-white/10 dark:ring-inset dark:ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6"
+                            placeholder="Type your email..."
+                            />
+                            <button
+                            type="submit"
+                            class="flex-none rounded-md bg-indigo-500 py-2.5 px-3.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                            >
+                            Subscribe
+                            </button>
+                        </div>                        
+                    </form>
+
+                    <div id="form-result" class="mt-4 hidden">
+                        <div id="form-success" class="text-green-600">hi</div>
+                        <div id="form-error" class="text-red-600"></div>
+                    </div>
+            </div>
+        </div>
+    </div>
+    <div class="hidden lg:block lg:col-span-3 relative" id="footnotes-inline">
+        <!-- Inline footnotes -->
+        <template id="footnote-template">
+            <div class="text-slate-400 border-l-4 pl-2">
+                {CONTENT}
+            </div>
+        </template>
+    </div>
 </div>
+
+<script type="text/javascript">
+    const contentRaw = document.getElementById("content-raw");
+    const footnotes = document.getElementById("footnotes-inline");
+    const footnoteTemplate = document.getElementById("footnote-template");
+    
+    const footnoteSpacePadding = 20;
+
+    function updateFootnotes() {
+        let maxY = 0;
+
+        // Clear existing footnotes to avoid duplicates
+        footnotes.innerHTML = '';
+
+        document.querySelectorAll('.footnote-ref').forEach(callout => {
+            // Based on the atag link, get the actual footnote
+            const footnoteId = callout.getAttribute("href").replace("#", "");
+            const footnoteOriginal = document.getElementById(footnoteId);
+
+            // Get the position relative to the parent container and scroll
+            const calloutRect = callout.getBoundingClientRect();
+            const parentRect = contentRaw.getBoundingClientRect();
+            const top = Math.max(maxY + footnoteSpacePadding, calloutRect.top - parentRect.top);
+
+            // New footnote div
+            let footnote = document.createElement("div");
+            footnote.style.position = "absolute";
+            footnote.style.top = top + "px";
+            footnote.innerHTML = footnoteTemplate.innerHTML.replace("{CONTENT}", footnoteOriginal.innerHTML);
+
+            footnotes.appendChild(footnote);
+
+            // Find where this has rendered to present a cap on the y-axis for subsequent notes
+            const footnoteRect = footnote.getBoundingClientRect();
+            const footnoteTop = footnoteRect.top - parentRect.top;
+            const footnoteBottom = footnoteTop + footnoteRect.height;
+            maxY = footnoteBottom;
+        });
+    }
+
+    // Create a new ResizeObserver
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            // Check if the contentRaw is being observed and resized
+            if (entry.target === contentRaw) {
+                updateFootnotes();
+            }
+        }
+    });
+
+    // Start observing the contentRaw element
+    resizeObserver.observe(contentRaw);
+
+    // Call the function on initial load
+    updateFootnotes();
+</script>
 
 <script type="text/javascript">
     const form = document.getElementById("newsletter-form");
@@ -111,5 +181,17 @@
         });
     });
 </script>
+
+<style>
+    /*
+     * md: 	@media (min-width: 768px) { ... }
+     * lg: @media (min-width: 1024px) { ... }
+     */
+    @media (min-width: 1024px) {
+        .footnote {
+            display: none;
+        }
+    }
+</style>
 
 {% endblock %}

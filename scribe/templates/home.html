@@ -11,52 +11,41 @@ Home
         {%include "logo.html"%}
     {% endwith %}
 </div>
-<div class="mt-8 max-w-2xl mx-auto px-4 text-gray-900 dark:text-gray-100">
+<div class="mt-8 max-w-3xl mx-auto px-4 text-gray-900 dark:text-gray-100">
 
     <div class="flex items-center tracking-tight">
         <img src="/icons/self_small.jpg" class="rounded-2xl w-44 h-44"></img>
         <div class="text-3xl font-bold ml-4">
             <div>Hi, I'm Pierce Freeman. I'm a ML engineer and founder.</div>
+            <div class="mt-4">Get in touch: <a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="mailto:pierce@freeman.vc">pierce@freeman.vc</a></div>
         </div>
+    </div>
+    <div class="text-4xl text-gray-400 text-center">
+        ~ ~ ~
+    </div>    
+    <div class="mt-4 space-y-4">
+        {% for note in filter_tag(notes, "!travel") %}
+        <div>
+            <a href="/notes/{{note.webpage_path}}">
+                <div class="group hover:-mt-[3px] hover:pb-[3px] transition-all duration-100">
+                    <div class="py-2 {% if loop.index == 0 %} pt-0 {% endif %}">
+                        <div class="bg-indigo-500 text-white font-bold p-2 rounded flex items-center group-hover:shadow-md transition-all duration-100">
+                            <p class="grow">{{note.title}}</p>
+                            <div class="bg-white rounded p-1 text-indigo-500 font-bold text-sm">{{note.metadata.date.strftime("%B %-d, %Y")}}</div>
+                        </div>
+                    </div>
+                    <article>
+                        <p class="break-all text-ellipsis line-clamp-4 text-gray-800">
+                            {{note.get_preview()}}
+                        </p>
+                    </article>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
     </div>
 </div>
 
-<div class="py-8 max-w-4xl mx-auto px-4 text-gray-900 dark:text-gray-100">
-    <div class="grid grid-cols-2 gap-x-8 gap-y-8">
-        <div class="col-span-2 md:col-span-1">
-            <div class="text-xl"><i class="text-red-700 dark:text-red-500 font-semibold">What</i> I'm thinking...</div>
-            {% for note in filter_tag(notes, "!travel")[:3] %}
-            <a href="/notes/{{note.webpage_path}}">
-                <div class="mt-4 rounded border dark:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-6">
-                    <div class="text-lg md:text-base font-semibold text-red-700 dark:text-red-500">{{note.title}}</div>
-                    <div class="text-base md:text-sm text-gray-600 dark:text-gray-400">{{note.metadata.date.strftime("%B %-d, %Y")}}</div>
-                </div>
-            </a>
-            {% endfor %}
-            <a href="/notes">
-                <div class="mt-4 rounded border dark:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-6">
-                    <div class="text-lg md:text-base font-semibold text-red-700 dark:text-red-500">See More</div>
-                </div>
-            </a>
-        </div>
-
-        <div class="col-span-2 md:col-span-1">
-            <div class="text-xl"><i class="text-orange-700 dark:text-orange-500 font-semibold">Where</i> I am...</div>
-            {% for note in filter_tag(notes, "travel")[:3] %}
-            <a href="/notes/{{note.webpage_path}}">
-                <div class="mt-4 rounded border dark:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-6">
-                    <div class="text-lg md:text-base font-semibold text-orange-700 dark:text-orange-500">{{note.title}}</div>
-                    <div class="text-base md:text-sm text-gray-600 dark:text-gray-400">{{note.metadata.date.strftime("%B %-d, %Y")}}</div>
-                </div>
-            </a>
-            {% endfor %}
-            <a href="/travel">
-                <div class="mt-4 rounded border dark:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-6">
-                    <div class="text-lg md:text-base font-semibold text-orange-700 dark:text-orange-500">See More</div>
-                </div>
-            </a>
-        </div>
-    </div>
 </div>
 
 {% endblock %}

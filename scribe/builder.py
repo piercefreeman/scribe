@@ -62,15 +62,6 @@ class WebsiteBuilder:
                     "rss.xml", "rss.xml", TemplateArguments(notes=published_notes)
                 ),
                 PageDefinition(
-                    "notes.html",
-                    "notes.html",
-                    TemplateArguments(
-                        notes=filter_tag(published_notes, "!travel"),
-                        offset=0,
-                        limit=SINGLE_PAGE_NOTE_LIMIT,
-                    ),
-                ),
-                PageDefinition(
                     "travel.html",
                     "travel.html",
                     TemplateArguments(notes=filter_tag(published_notes, "travel")),
@@ -78,18 +69,6 @@ class WebsiteBuilder:
                 PageDefinition("about.html", "about.html"),
             ],
             output_path,
-        )
-        self.build_pages(
-            [
-                PageDefinition("notes.html", f"{i}.html", argument)
-                for i, argument in enumerate(
-                    self.get_paginated_arguments(
-                        filter_tag(published_notes, "!travel"),
-                        limit=SINGLE_PAGE_NOTE_LIMIT,
-                    )
-                )
-            ],
-            output_path / "notes",
         )
         self.build_static(output_path)
 

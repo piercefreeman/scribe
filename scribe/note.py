@@ -211,6 +211,22 @@ class Note:
 
         return str(content)
 
+    def get_preview(self):
+        html = markdown(
+            self.text,
+            extensions=[
+                CodeHiliteExtension(use_pygments=True),
+                FencedCodeExtension(),
+                FootnoteExtension(BACKLINK_TEXT="↢"),
+                TableExtension(),
+            ],
+        )
+
+        content = BeautifulSoup(html, "html.parser")
+
+        # Return just the text
+        return content.get_text()[:1000]
+
     @property
     def read_time_minutes(self):
         # https://www.sciencedirect.com/science/article/abs/pii/S0749596X19300786
