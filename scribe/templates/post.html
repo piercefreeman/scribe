@@ -29,52 +29,53 @@
                     {{content|safe}}
                 </div>
             </article>
-
-            <div class="mt-8">
-                <div class="rounded-lg bg-gray-900 dark:bg-gray-200 px-6 py-8">
-                    <div class="text-base text-gray-200 dark:text-gray-900">
-                        <h2 class="text-3xl font-bold tracking-tight">Stay in Touch</h2>
-                        <p class="mt-4">I write mostly about engineering, machine learning, and company building. If you want to get updated about longer essays, subscribe here.</p>                    
-                        <p class="mt-4">I hate spam so I keep these infrequent - once or twice a month, maximum.</p>
-                    </div>
-        
-                    <form id="newsletter-form">
-                        <div class="mt-4 flex gap-x-4">
-                            <label htmlFor="email-address" class="sr-only">
-                            Email address
-                            </label>
-                            <input
-                            id="email-address"
-                            name="email_address"
-                            type="email"
-                            autoComplete="email"
-                            required
-                            class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-white dark:text-gray-900 shadow-sm ring-1 ring-inset ring-white/10 dark:ring-inset dark:ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6"
-                            placeholder="Type your email..."
-                            />
-                            <button
-                            type="submit"
-                            class="flex-none rounded-md bg-indigo-500 py-2.5 px-3.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                            >
-                            Subscribe
-                            </button>
-                        </div>                        
-                    </form>
-
-                    <div id="form-result" class="mt-4 hidden">
-                        <div id="form-success" class="text-green-600">hi</div>
-                        <div id="form-error" class="text-red-600"></div>
-                    </div>
-            </div>
+        </div>
+        <div class="hidden lg:block lg:col-span-4 relative" id="footnotes-inline">
+            <!-- Inline footnotes -->
+            <template id="footnote-template">
+                <div class="text-slate-400 prose border-l-4 pl-2">
+                    {CONTENT}
+                </div>
+            </template>
         </div>
     </div>
-    <div class="hidden lg:block lg:col-span-4 relative" id="footnotes-inline">
-        <!-- Inline footnotes -->
-        <template id="footnote-template">
-            <div class="text-slate-400 border-l-4 pl-2">
-                {CONTENT}
-            </div>
-        </template>
+
+    <div class="mt-8">
+            <div class="rounded-lg bg-gray-900 dark:bg-gray-200 px-6 py-8">
+                <div class="text-base text-gray-200 dark:text-gray-900">
+                    <h2 class="text-3xl font-bold tracking-tight">Stay in Touch</h2>
+                    <p class="mt-4">I write mostly about engineering, machine learning, and company building. If you want to get updated about longer essays, subscribe here.</p>                    
+                    <p class="mt-4">I hate spam so I keep these infrequent - once or twice a month, maximum.</p>
+                </div>
+
+                <form id="newsletter-form">
+                    <div class="mt-4 flex gap-x-4">
+                        <label htmlFor="email-address" class="sr-only">
+                        Email address
+                        </label>
+                        <input
+                        id="email-address"
+                        name="email_address"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-white dark:text-gray-900 shadow-sm ring-1 ring-inset ring-white/10 dark:ring-inset dark:ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6"
+                        placeholder="Type your email..."
+                        />
+                        <button
+                        type="submit"
+                        class="flex-none rounded-md bg-indigo-500 py-2.5 px-3.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                        >
+                        Subscribe
+                        </button>
+                    </div>                        
+                </form>
+
+                <div id="form-result" class="mt-4 hidden">
+                    <div id="form-success" class="text-green-600">hi</div>
+                    <div id="form-error" class="text-red-600"></div>
+                </div>
+        </div>
     </div>
 </div>
 
@@ -92,7 +93,7 @@
         footnotes.innerHTML = '';
 
         document.querySelectorAll('.footnote-ref').forEach(callout => {
-            // Based on the atag link, get the actual footnote
+            // Based on the a tag link, get the actual footnote
             const footnoteId = callout.getAttribute("href").replace("#", "");
             const footnoteOriginal = document.getElementById(footnoteId);
 
