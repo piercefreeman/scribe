@@ -11,17 +11,12 @@
 
 <div class="rounded-sm"></div>
 
-<div class="max-w-4xl mx-auto mt-6 pb-8 px-4 md:px-8 lg:px-0">
-    <div>
-        <div class="md:pr-24">
+<div class="sm:max-w-xl md:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto mt-6 pb-8 px-4 md:px-8 lg:px-0">
+    <div class="flex justify-center">
+        <div class="lg:w-[650px] xl:xl-[700px] px-4" id="content-raw">
             <article>
-            <h1 class="block font-medium tracking-normal bg-indigo-500 text-white text-4xl md:text-7xl py-4 px-6 -rotate-1 rounded">{{header}}</h1>
-            </article>
-        </div>
-    </div>
-    <div class="grid grid-cols-12">
-        <div class="col-span-12 lg:col-span-8 px-4" id="content-raw">
-            <article>
+                <h1 class="block font-medium tracking-normal bg-indigo-500 text-white text-4xl md:text-7xl py-4 px-6 -rotate-1 rounded">{{header}}</h1>
+
                 <div class="mt-4 text-lg text-gray-300">
                     <h6># {{metadata.date.strftime("%B %-d, %Y")}}</h6>
                 </div>
@@ -30,7 +25,7 @@
                 </div>
             </article>
         </div>
-        <div class="hidden lg:block lg:col-span-4 relative" id="footnotes-inline">
+        <div class="hidden relative {% if has_footnotes %}lg:block lg:grow{% endif %}" id="footnotes-inline">
             <!-- Inline footnotes -->
             <template id="footnote-template">
                 <div class="text-slate-400 prose border-l-4 pl-2">
@@ -116,6 +111,9 @@
             const footnoteBottom = footnoteTop + footnoteRect.height;
             maxY = footnoteBottom;
         });
+
+        // 25px padding on the bottom of the page
+        footnotes.style.minHeight = (maxY + 25) + "px";
     }
 
     // Create a new ResizeObserver

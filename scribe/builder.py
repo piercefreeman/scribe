@@ -87,6 +87,7 @@ class WebsiteBuilder:
                         header=note.title,
                         metadata=note.metadata,
                         content=note.get_html(),
+                        has_footnotes=note.has_footnotes(),
                     )
                 )
 

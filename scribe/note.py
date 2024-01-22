@@ -211,6 +211,10 @@ class Note:
 
         return str(content)
 
+    def has_footnotes(self):
+        # Find footnote definitions in the text
+        return self.text.find("[^") != -1
+
     def get_preview(self):
         html = markdown(
             self.text,
