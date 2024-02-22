@@ -1,34 +1,40 @@
-{% extends "base.html" %}
-
-{% block title %}
-{{header}}
-{% endblock %}
-
-{% block content %}
-<div>
-    {%include "logo.html"%}
-</div>
+{% extends "base.html" %} {% block title %} {{header}} {% endblock %} {% block
+content %}
+<div>{%include "logo.html"%}</div>
 
 <div class="rounded-sm"></div>
 
-<div class="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto mt-6 pb-8 px-4 md:px-8 lg:px-0">
+<div
+    class="mx-auto mt-6 px-4 pb-8 sm:max-w-2xl md:max-w-3xl md:px-8 lg:max-w-4xl lg:px-0 xl:max-w-5xl"
+>
     <div class="flex justify-center">
-        <div class="w-full lg:w-[650px] xl:w-[700px] px-4" id="content-raw">
+        <div class="w-full px-4 lg:w-[650px] xl:w-[700px]" id="content-raw">
             <article>
-                <h1 class="block font-medium tracking-normal bg-indigo-500 text-white text-4xl md:text-7xl py-4 px-6 -rotate-1 rounded lg:-mr-24">{{header}}</h1>
+                <h1
+                    class="block -rotate-1 rounded bg-indigo-500 px-6 py-4 text-4xl font-medium tracking-normal text-white md:text-7xl lg:-mr-24"
+                >
+                    {{header}}
+                </h1>
 
                 <div class="mt-4 text-lg text-gray-300">
                     <h6># {{metadata.date.strftime("%B %-d, %Y")}}</h6>
                 </div>
-                <div class="article-large mt-4 prose prose-img:m-0 dark:prose-invert max-w-none">
+                <div
+                    class="article-large prose prose-img:m-0 dark:prose-invert mt-4 max-w-none"
+                >
                     {{content|safe}}
                 </div>
             </article>
         </div>
-        <div class="hidden relative {% if has_footnotes %}lg:block lg:grow{% endif %}" id="footnotes-inline">
+        <div
+            class="{% if has_footnotes %}lg:block lg:grow{% endif %} relative hidden"
+            id="footnotes-inline"
+        >
             <!-- Inline footnotes -->
             <template id="footnote-template">
-                <div class="text-slate-400 prose border-l-4 pl-2">
+                <div
+                    class="prose dark:prose-invert border-l-4 pl-2 text-slate-400"
+                >
                     {CONTENT}
                 </div>
             </template>
@@ -36,40 +42,47 @@
     </div>
 
     <div class="mt-8">
-            <div class="rounded-lg bg-gray-900 dark:bg-gray-200 px-6 py-8">
-                <div class="text-base text-gray-200 dark:text-gray-900">
-                    <h2 class="text-3xl font-bold tracking-tight">Stay in Touch</h2>
-                    <p class="mt-4">I write mostly about engineering, machine learning, and company building. If you want to get updated about longer essays, subscribe here.</p>                    
-                    <p class="mt-4">I hate spam so I keep these infrequent - once or twice a month, maximum.</p>
-                </div>
+        <div class="rounded-lg bg-gray-900 px-6 py-8 dark:bg-gray-200">
+            <div class="text-base text-gray-200 dark:text-gray-900">
+                <h2 class="text-3xl font-bold tracking-tight">Stay in Touch</h2>
+                <p class="mt-4">
+                    I write mostly about engineering, machine learning, and
+                    company building. If you want to get updated about longer
+                    essays, subscribe here.
+                </p>
+                <p class="mt-4">
+                    I hate spam so I keep these infrequent - once or twice a
+                    month, maximum.
+                </p>
+            </div>
 
-                <form id="newsletter-form">
-                    <div class="mt-4 flex gap-x-4">
-                        <label htmlFor="email-address" class="sr-only">
+            <form id="newsletter-form">
+                <div class="mt-4 flex gap-x-4">
+                    <label htmlFor="email-address" class="sr-only">
                         Email address
-                        </label>
-                        <input
+                    </label>
+                    <input
                         id="email-address"
                         name="email_address"
                         type="email"
-                        autoComplete="email"
+                        autocomplete="email"
                         required
-                        class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-white dark:text-gray-900 shadow-sm ring-1 ring-inset ring-white/10 dark:ring-inset dark:ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6"
+                        class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 dark:text-gray-900 dark:ring-inset dark:ring-gray-300 dark:focus:ring-indigo-500"
                         placeholder="Type your email..."
-                        />
-                        <button
+                    />
+                    <button
                         type="submit"
-                        class="flex-none rounded-md bg-indigo-500 py-2.5 px-3.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                        >
+                        class="flex-none rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                    >
                         Subscribe
-                        </button>
-                    </div>                        
-                </form>
-
-                <div id="form-result" class="mt-4 hidden">
-                    <div id="form-success" class="text-green-600">hi</div>
-                    <div id="form-error" class="text-red-600"></div>
+                    </button>
                 </div>
+            </form>
+
+            <div id="form-result" class="mt-4 hidden">
+                <div id="form-success" class="text-green-600">hi</div>
+                <div id="form-error" class="text-red-600"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -78,16 +91,16 @@
     const contentRaw = document.getElementById("content-raw");
     const footnotes = document.getElementById("footnotes-inline");
     const footnoteTemplate = document.getElementById("footnote-template");
-    
+
     const footnoteSpacePadding = 20;
 
     function updateFootnotes() {
         let maxY = 0;
 
         // Clear existing footnotes to avoid duplicates
-        footnotes.innerHTML = '';
+        footnotes.innerHTML = "";
 
-        document.querySelectorAll('.footnote-ref').forEach(callout => {
+        document.querySelectorAll(".footnote-ref").forEach((callout) => {
             // Based on the a tag link, get the actual footnote
             const footnoteId = callout.getAttribute("href").replace("#", "");
             const footnoteOriginal = document.getElementById(footnoteId);
@@ -95,13 +108,19 @@
             // Get the position relative to the parent container and scroll
             const calloutRect = callout.getBoundingClientRect();
             const parentRect = contentRaw.getBoundingClientRect();
-            const top = Math.max(maxY + footnoteSpacePadding, calloutRect.top - parentRect.top);
+            const top = Math.max(
+                maxY + footnoteSpacePadding,
+                calloutRect.top - parentRect.top,
+            );
 
             // New footnote div
             let footnote = document.createElement("div");
             footnote.style.position = "absolute";
             footnote.style.top = top + "px";
-            footnote.innerHTML = footnoteTemplate.innerHTML.replace("{CONTENT}", footnoteOriginal.innerHTML);
+            footnote.innerHTML = footnoteTemplate.innerHTML.replace(
+                "{CONTENT}",
+                footnoteOriginal.innerHTML,
+            );
 
             footnotes.appendChild(footnote);
 
@@ -113,11 +132,11 @@
         });
 
         // 25px padding on the bottom of the page
-        footnotes.style.minHeight = (maxY + 25) + "px";
+        footnotes.style.minHeight = maxY + 25 + "px";
     }
 
     // Create a new ResizeObserver
-    const resizeObserver = new ResizeObserver(entries => {
+    const resizeObserver = new ResizeObserver((entries) => {
         for (let entry of entries) {
             // Check if the contentRaw is being observed and resized
             if (entry.target === contentRaw) {
@@ -140,44 +159,54 @@
     const formError = document.getElementById("form-error");
 
     function uuidv4() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+            /[xy]/g,
+            function (c) {
+                var r = (Math.random() * 16) | 0,
+                    v = c == "x" ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+            },
+        );
     }
 
-    form.addEventListener("submit", function(event) {
+    form.addEventListener("submit", function (event) {
         event.preventDefault();
         var data = new FormData(form);
-        data.append("token", "")
-        data.append("user", uuidv4())
-        data.append("referrer", window.location.host)
+        data.append("token", "");
+        data.append("user", uuidv4());
+        data.append("referrer", window.location.host);
 
         fetch("https://app.convertkit.com/forms/4967888/subscriptions", {
             method: "post",
             body: data,
             headers: {
-                "Accept": "application/json"
-            }
-        }).then(function(response) {
-            if (response.status !== 200) {
-                console.error("Newsletter Submission Error: " + response.status);
-                formResult.classList.remove("hidden");
-                formError.innerHTML = "There was a problem, please try again later."
-                form.innerHTML = "";
-                return;
-            }
+                Accept: "application/json",
+            },
+        })
+            .then(function (response) {
+                if (response.status !== 200) {
+                    console.error(
+                        "Newsletter Submission Error: " + response.status,
+                    );
+                    formResult.classList.remove("hidden");
+                    formError.innerHTML =
+                        "There was a problem, please try again later.";
+                    form.innerHTML = "";
+                    return;
+                }
 
-            return response.json();
-        }).then(function(data) {
-            formResult.classList.remove("hidden");
-            form.innerHTML = "";
-            if (data.status == "success") {
-                formSuccess.innerHTML = "Thanks for subscribing!"
-            } else {
-                formError.innerHTML = "There was a problem, please try again later."
-            }
-        });
+                return response.json();
+            })
+            .then(function (data) {
+                formResult.classList.remove("hidden");
+                form.innerHTML = "";
+                if (data.status == "success") {
+                    formSuccess.innerHTML = "Thanks for subscribing!";
+                } else {
+                    formError.innerHTML =
+                        "There was a problem, please try again later.";
+                }
+            });
     });
 </script>
 
