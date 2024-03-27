@@ -1,119 +1,270 @@
-{% extends "base.html" %}
-
-{% block title %}
-About
-{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %} About {% endblock %} {% block
+content %}
 <div>
-    {% with %}
-    {% set active = "about" %}
-        {%include "logo.html"%}
-    {% endwith %}
+    {% with %} {% set active = "about" %} {%include "logo.html"%} {% endwith %}
 </div>
-<div class="text-lg md:text-base mt-6 max-w-2xl mx-auto px-4 text-gray-900 dark:text-gray-100">
+<div
+    class="mx-auto mt-6 max-w-2xl px-4 text-lg text-gray-900 md:text-base dark:text-gray-100"
+>
     <div class="space-y-4">
         <div class="flex items-center">
             <div>
-                <div class="relative bg-white mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0">
+                <div
+                    class="relative mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full bg-white shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0"
+                >
                     <img src="/icons/monkeysee.png" class="h-12" />
                 </div>
             </div>
             <div class="ml-4">
-                <div class="font-semibold text-gray-600 dark:text-gray-400">Founder</div>
-                <p>I founded <a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="https://www.monkeysee.ai">MonkeySee</a> to make it easier to test and automate webapps. We're using the latest language modeling and computer vision to understand HTML and act on it.</p>    
-            </div>    
+                <div class="font-semibold text-gray-600 dark:text-gray-400">
+                    Founder
+                </div>
+                <p>
+                    I founded
+                    <a
+                        class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                        href="https://www.monkeysee.ai"
+                        >MonkeySee</a
+                    >
+                    to make it easier to test and automate webapps. We're using
+                    the latest language modeling and computer vision to
+                    understand HTML and act on it.
+                </p>
+            </div>
         </div>
 
         <div class="flex items-center">
             <div>
-                <div class="relative bg-white mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0">
+                <div
+                    class="relative mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full bg-white shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0"
+                >
                     <img src="/icons/globality.png" class="h-10" />
                 </div>
             </div>
             <div class="ml-4">
-                <div class="font-semibold text-gray-600 dark:text-gray-400">Software Engineer ↣ Vice President, Machine Learning</div>
-                <p>I was at <a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="https://www.globality.com">Globality</a> for just over five years. I built up most of their initial ML platform (years 1-3) and then focused on growing their team into the organization it is today (years 3-5). Our focus was building the world's most extensive network of professional service suppliers using web crawling, information extraction, and NLP.</p>    
-            </div>    
+                <div class="font-semibold text-gray-600 dark:text-gray-400">
+                    Software Engineer ↣ Vice President, Machine Learning
+                </div>
+                <p>
+                    I was at
+                    <a
+                        class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                        href="https://www.globality.com"
+                        >Globality</a
+                    >
+                    for just over five years. I built up most of their initial
+                    ML platform (years 1-3) and then focused on growing their
+                    team into the organization it is today (years 3-5). Our
+                    focus was building the world's most extensive network of
+                    professional service suppliers using web crawling,
+                    information extraction, and NLP.
+                </p>
+            </div>
         </div>
-    
+
         <div class="flex items-center">
             <div>
-                <div class="relative bg-white mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0">
-                    <div class="text-3xl align-center justify-center -translate-x-[1px]">🌱</div>
+                <div
+                    class="relative mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full bg-white shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0"
+                >
+                    <div
+                        class="align-center -translate-x-[1px] justify-center text-3xl"
+                    >
+                        🌱
+                    </div>
                 </div>
             </div>
             <div class="ml-4">
-                <div class="font-semibold text-gray-600 dark:text-gray-400">Investor & Advisor</div>
-                <p>I make small seed-sized investments in promising deep tech startups. I also advise companies on engineering architecture and AI strategy.</p>    
-            </div>    
+                <div class="font-semibold text-gray-600 dark:text-gray-400">
+                    Investor & Advisor
+                </div>
+                <p>
+                    I make small seed-sized investments in promising deep tech
+                    startups. I also advise companies on engineering
+                    architecture and AI strategy.
+                </p>
+            </div>
         </div>
-    
+
         <div class="flex items-center">
             <div>
-                <div class="relative bg-white mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0">
+                <div
+                    class="relative mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full bg-white shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0"
+                >
                     <img src="/icons/fcc.png" class="h-10" />
                 </div>
             </div>
             <div class="ml-4">
-                <div class="font-semibold text-gray-600 dark:text-gray-400">Engineer in Residence (Intern)</div>
-                <p>At <a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="https://www.founderscircle.com">Founders Circle Capital</a>, I wrote an ML prioritization pipeline for their prospects so they could focus on the highest likelihood leads.</p>
+                <div class="font-semibold text-gray-600 dark:text-gray-400">
+                    Engineer in Residence (Intern)
+                </div>
+                <p>
+                    At
+                    <a
+                        class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                        href="https://www.founderscircle.com"
+                        >Founders Circle Capital</a
+                    >, I wrote an ML prioritization pipeline for their prospects
+                    so they could focus on the highest likelihood leads.
+                </p>
             </div>
         </div>
-    
+
         <div class="flex items-center">
             <div>
-                <div class="relative bg-white mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0">
+                <div
+                    class="relative mt-1 flex h-14 w-14 flex-none items-center justify-center rounded-full bg-white shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:ring-0"
+                >
                     <img src="/icons/stanford.png" class="h-10" />
                 </div>
             </div>
             <div class="ml-4">
-                <div class="font-semibold text-gray-600 dark:text-gray-400">Student</div>
-                <p>I studied at <a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="https://www.stanford.edu">Stanford University</a>. My core research was on predictive time series data (for wearable sensors) and multimodal models for language modeling and vision understanding.</p>
+                <div class="font-semibold text-gray-600 dark:text-gray-400">
+                    Student
+                </div>
+                <p>
+                    I studied at
+                    <a
+                        class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                        href="https://www.stanford.edu"
+                        >Stanford University</a
+                    >. My core research was on predictive time series data (for
+                    wearable sensors) and multimodal models for language
+                    modeling and vision understanding.
+                </p>
             </div>
         </div>
     </div>
-
 
     <div class="py-6">
-        <div class="border p-6 rounded-lg">
-            <div class="font-semibold flex items-center text-gray-600 dark:text-gray-400">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-                    <path fill-rule="evenodd" d="M5.25 2.25a3 3 0 00-3 3v4.318a3 3 0 00.879 2.121l9.58 9.581c.92.92 2.39 1.186 3.548.428a18.849 18.849 0 005.441-5.44c.758-1.16.492-2.629-.428-3.548l-9.58-9.581a3 3 0 00-2.122-.879H5.25zM6.375 7.5a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25z" clip-rule="evenodd" />
-                  </svg>
-                  
+        <div class="rounded-lg border p-6">
+            <div
+                class="flex items-center font-semibold text-gray-600 dark:text-gray-400"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    class="h-4 w-4"
+                >
+                    <path
+                        fill-rule="evenodd"
+                        d="M5.25 2.25a3 3 0 00-3 3v4.318a3 3 0 00.879 2.121l9.58 9.581c.92.92 2.39 1.186 3.548.428a18.849 18.849 0 005.441-5.44c.758-1.16.492-2.629-.428-3.548l-9.58-9.581a3 3 0 00-2.122-.879H5.25zM6.375 7.5a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25z"
+                        clip-rule="evenodd"
+                    />
+                </svg>
+
                 <div class="ml-1">Projects</div>
             </div>
-    
-            <div class="space-y-4 mt-4">
+
+            <div class="mt-4 space-y-4">
                 <div>
-                    <div><a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="https://github.com/piercefreeman/gpt-json">gpt-json</a></div>
-                    <div>gpt-json provides schema definition and validation for the GPT line of models, for use in data pipelines and structured reasoning.</div>
-                </div>
-    
-                <div>
-                    <div><a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="https://github.com/piercefreeman/vectordb-orm">vectordb-orm</a></div>
-                    <div>vectordb-orm is a small ORM wrapper on top of vector databases. It allows for easier model definition as Python objects and abstracts the backend details. Currently supporting Milvus and Pinecone.</div>
-                </div>
-    
-                <div>
-                    <div><a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="https://github.com/piercefreeman/dagorama">dagorama</a></div>
-                    <div>Dagorama is a simple daemon library for Python. It's a hybrid between Celery and Dask, where tasks can be chained together but run on different machines in parallel. Work in Progress.</div>
+                    <div>
+                        <a
+                            class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                            href="https://github.com/piercefreeman/mountaineer"
+                            >mountaineer</a
+                        >
+                    </div>
+                    <div>
+                        Mountaineer is a batteries-included web framework for
+                        Python. It gives you typehinting up and down the stack:
+                        from database to frontend. It also supports full V8
+                        server-side rendering, application configuration, native
+                        Typescript integrations, and a build pipeline written in
+                        Rust.
+                    </div>
                 </div>
 
                 <div>
-                    <div><a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="https://github.com/piercefreeman/grooveproxy">groove</a></div>
-                    <div>Groove is a MITM proxy specifically optimized for web crawling and unit test construction. The core logic is written in Go and provides an API client in Python. It allows customization of cache handling, request recording, 3rd party routing, and TLS fingerprinting.</div>
+                    <div>
+                        <a
+                            class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                            href="https://github.com/piercefreeman/gpt-json"
+                            >gpt-json</a
+                        >
+                    </div>
+                    <div>
+                        gpt-json provides schema definition and validation for
+                        the GPT line of models, for use in data pipelines and
+                        structured reasoning.
+                    </div>
                 </div>
 
                 <div>
-                    <div><a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200 font-bold" href="https://github.com/piercefreeman/docker/tree/main/headfull-chromium">headfull-chromium</a></div>
-                    <div>Headfull Chrome is a docker image for easier web crawling that integrates font packages, display virtualization, and remote control. It makes it easier to develop web automation that mirrors how you use a browser. For more background, see <a class="text-blue-500 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200" href="/notes/headfull-browsers-beat-headless">the post</a> on motivations.</div>
+                    <div>
+                        <a
+                            class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                            href="https://github.com/piercefreeman/vectordb-orm"
+                            >vectordb-orm</a
+                        >
+                    </div>
+                    <div>
+                        vectordb-orm is a small ORM wrapper on top of vector
+                        databases. It allows for easier model definition as
+                        Python objects and abstracts the backend details.
+                        Currently supporting Milvus and Pinecone.
+                    </div>
+                </div>
+
+                <div>
+                    <div>
+                        <a
+                            class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                            href="https://github.com/piercefreeman/dagorama"
+                            >dagorama</a
+                        >
+                    </div>
+                    <div>
+                        Dagorama is a simple daemon library for Python. It's a
+                        hybrid between Celery and Dask, where tasks can be
+                        chained together but run on different machines in
+                        parallel. Work in Progress.
+                    </div>
+                </div>
+
+                <div>
+                    <div>
+                        <a
+                            class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                            href="https://github.com/piercefreeman/grooveproxy"
+                            >groove</a
+                        >
+                    </div>
+                    <div>
+                        Groove is a MITM proxy specifically optimized for web
+                        crawling and unit test construction. The core logic is
+                        written in Go and provides an API client in Python. It
+                        allows customization of cache handling, request
+                        recording, 3rd party routing, and TLS fingerprinting.
+                    </div>
+                </div>
+
+                <div>
+                    <div>
+                        <a
+                            class="font-bold text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                            href="https://github.com/piercefreeman/docker/tree/main/headfull-chromium"
+                            >headfull-chromium</a
+                        >
+                    </div>
+                    <div>
+                        Headfull Chrome is a docker image for easier web
+                        crawling that integrates font packages, display
+                        virtualization, and remote control. It makes it easier
+                        to develop web automation that mirrors how you use a
+                        browser. For more background, see
+                        <a
+                            class="text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                            href="/notes/headfull-browsers-beat-headless"
+                            >the post</a
+                        >
+                        on motivations.
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
 </div>
 
 {% endblock %}
