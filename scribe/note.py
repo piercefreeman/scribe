@@ -207,7 +207,16 @@ class Note:
         # Style images - these should be located somewhere in the html dom (like in a template
         # tag - so tailwind can pick up on them)
         for img in content.find_all("img"):
-            img["class"] = " ".join([*img.get("class", []), "rounded-sm"])
+            image_classes = img.get("class", [])
+            image_classes.append("rounded-lg shadow-lg border-4 border-white")
+
+            # Travel specific styling
+            # TODO: Generalize
+            if "travel" in self.metadata.tags:
+                image_classes.append("lg:max-w-[100vw] lg:-ml-[125px] lg:w-offset-content-image-lg")
+                image_classes.append("xl:-ml-[250px] xl:w-offset-content-image-xl")
+
+            img["class"] = " ".join(image_classes)
 
         return str(content)
 

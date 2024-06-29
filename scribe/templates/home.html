@@ -11,7 +11,7 @@ Home
         {%include "logo.html"%}
     {% endwith %}
 </div>
-<div class="mt-4 max-w-3xl mx-auto px-4 text-gray-900 dark:text-gray-100">
+<div class="mt-4 max-w-3xl mx-auto px-4 text-gray-900 dark:text-gray-100 pb-8 pb-8">
 
     <div class="flex flex-col md:flex-row items-center tracking-tight gap-y-4">
         <img src="/icons/self_small.jpg" class="rounded-2xl w-44 h-44"></img>
@@ -22,7 +22,7 @@ Home
     </div>
     <div class="mt-4 text-4xl text-gray-400 text-center">
         ~ ~ ~
-    </div>    
+    </div>
     <div class="mt-4 space-y-4">
         {% for note in filter_tag(notes, "!travel") %}
         <div>
