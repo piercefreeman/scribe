@@ -1,40 +1,43 @@
-{% extends "base.html" %}
-
-{% block title %}
-Travel
-{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %} Travel {% endblock %} {% block
+content %}
 <div>
-    {% with %}
-    {% set active = "travel" %}
-        {%include "logo.html"%}
-    {% endwith %}
+    {% with %} {% set active = "travel" %} {%include "logo.html"%} {% endwith %}
 </div>
-<div class="mt-8 max-w-6xl mx-auto px-4 text-gray-900 dark:text-gray-100 text-base">
-    <div class="mt-4 grid grid-cols-4 gap-x-2">
-        <div class="col-span-3 divide-y divide-slate-200 dark:divide-slate-800">
-            <div class="mt-12 grid max-w-5xl mx-auto sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4 items-center justify-center px-4">
-                {% for note in filter_tag(notes, "travel") %}
-                    {% for definition in note.featured_assets %}
-                        <a href="/notes/{{note.webpage_path}}">
-                            <img src="{{definition.asset.remote_preview_path}}" class="rounded-lg object-cover h-56 md:h-96 w-96 transition {% if loop.index is divisibleby 2 %}rotate-1{% else %}-rotate-1{% endif %} {% if definition.cover == FeaturedPhotoPosition.CENTER %} object-center {% elif definition.cover == FeaturedPhotoPosition.LEFT %} object-left {% elif definition.cover == FeaturedPhotoPosition.RIGHT %} object-right {% endif %} hover:rotate-0 hover:shadow-lg" />
-                        </a>
-                    {% endfor %}
-                {% endfor %}
-            </div>
-        </div>
+<div
+    class="mt-8 max-w-6xl mx-auto px-4 text-gray-900 dark:text-gray-100 text-base pb-8"
+>
+    <div class="grid grid-cols-2 gap-8">
+        {% for note in filter_tag(notes, "travel") %}
         <div>
-            {% for note in filter_tag(notes, "travel") %}
-            <div>
-                <a href="./notes/{{note.webpage_path}}">
-                    <div class="py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md">
-                        <div class="text-black-900 dark:text-gray-200 font-semibold text-sm">{{note.title}}</div>
-                    </div>
-                </a>
+            <div class="group hover:-mt-[3px] hover:pb-[3px] transition-all">
+                <div
+                    class="relative border-4 border-white shadow-xl rounded-lg"
+                >
+                    <a href="./notes/{{note.webpage_path}}">
+                        {% if note.featured_assets %}
+                        <img
+                            src="{{note.featured_assets[0].asset.remote_preview_path}}"
+                            class="rounded-lg object-cover h-96 w-full transition-all {% if note.featured_assets[0].cover == FeaturedPhotoPosition.CENTER %} object-center {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.LEFT %} object-left {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.RIGHT %} object-right {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.TOP %} object-top {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.BOTTOM %} object-bottom {% endif %}"
+                        />
+                        {% endif %}
+
+                        <div
+                            class="absolute bottom-0 left-0 right-0 bg-white/50 backdrop-blur-lg py-4 px-4 rounded-md flex items-center"
+                        >
+                            <div
+                                class="grow text-gray-800 dark:text-gray-200 font-semibold text-xl"
+                            >
+                                {{note.title}}
+                            </div>
+                            <div class="text-gray-700">
+                                {{note.metadata.date.strftime("%B %Y")}}
+                            </div>
+                        </div>
+                    </a>
+                </div>
             </div>
-            {% endfor %}
         </div>
+        {% endfor %}
     </div>
 </div>
 
