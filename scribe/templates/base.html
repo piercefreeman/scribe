@@ -6,8 +6,14 @@
 
         <title>{% block title %}{% endblock %} | Pierce Freeman</title>
 
-        <link href="/style.css" rel="stylesheet" />
-        <link href="/code.css" rel="stylesheet" />
+        <link
+            href="/style.css?hash={{build_metadata.style_hash}}"
+            rel="stylesheet"
+        />
+        <link
+            href="/code.css?hash={{build_metadata.code_hash}}"
+            rel="stylesheet"
+        />
 
         <style>
             @import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600");
