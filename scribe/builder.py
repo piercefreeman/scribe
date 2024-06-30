@@ -1,4 +1,5 @@
 from dataclasses import asdict, replace
+from hashlib import sha256
 from os import getenv
 from pathlib import Path
 from shutil import copyfile
@@ -11,7 +12,7 @@ from PIL.Image import Resampling
 
 from scribe.io import get_asset_path
 from scribe.links import local_to_remote_links
-from scribe.metadata import FeaturedPhotoPosition, NoteStatus
+from scribe.metadata import BuildMetadata, FeaturedPhotoPosition, NoteStatus
 from scribe.models import PageDefinition, PageDirection, TemplateArguments
 from scribe.note import Asset, Note
 from scribe.parsers import InvalidMetadataException
@@ -49,9 +50,15 @@ class WebsiteBuilder:
                 if note.metadata.status == NoteStatus.PUBLISHED
             ]
 
+        build_metadata = BuildMetadata()
+
+        # The static build phase will inject the stylesheet hashes that will be used
+        # for cache invalidation in subsequent pages
+        self.build_static(output_path, build_metadata)
+
         # Build all notes that are either in draft form or published. Draft notes require a unique
         # URL to access them but should be displayed publically
-        self.build_notes(all_notes, output_path)
+        self.build_notes(all_notes, output_path, build_metadata)
         self.build_pages(
             [
                 PageDefinition(
@@ -68,10 +75,12 @@ class WebsiteBuilder:
                 PageDefinition("about.html", "about.html"),
             ],
             output_path,
+            build_metadata,
         )
-        self.build_static(output_path)
 
-    def build_notes(self, notes: list[Note], output_path: Path):
+    def build_notes(
+        self, notes: list[Note], output_path: Path, build_metadata: BuildMetadata
+    ):
         # Upload the note assets
         for note in notes:
             for asset in note.assets:
@@ -96,10 +105,16 @@ class WebsiteBuilder:
                         metadata=note.metadata,
                         content=note.get_html(),
                         has_footnotes=note.has_footnotes(),
+                        build_metadata=build_metadata,
                     )
                 )
 
-    def build_pages(self, pages: list[PageDefinition], output_path: Path):
+    def build_pages(
+        self,
+        pages: list[PageDefinition],
+        output_path: Path,
+        build_metadata: BuildMetadata,
+    ):
         # Build pages
         for page in pages:
             secho(f"Processing: {page.template} -> {page.url}")
@@ -109,7 +124,9 @@ class WebsiteBuilder:
             page_args = self.augment_page_directions(page_args)
 
             with open(output_path / page.url, "w") as file:
-                file.write(template.render(**asdict(page_args)))
+                file.write(
+                    template.render(**asdict(page_args), build_metadata=build_metadata)
+                )
 
     def build_rss(self, notes, output_path):
         # Limit to just published notes
@@ -124,7 +141,7 @@ class WebsiteBuilder:
                 )
             )
 
-    def build_static(self, output_path):
+    def build_static(self, output_path: Path, build_metadata: BuildMetadata):
         # Build static
         static_path = get_asset_path("resources")
         for path in static_path.glob("**/*"):
@@ -134,6 +151,18 @@ class WebsiteBuilder:
             file_output = output_path / root_relative
             file_output.parent.mkdir(exist_ok=True)
             copyfile(path, file_output)
+
+        # Attempt to locate the built style and code paths
+        style_path = static_path / "style.css"
+        code_path = static_path / "code.css"
+        if style_path.exists():
+            build_metadata.style_hash = sha256(
+                style_path.read_text().encode()
+            ).hexdigest()
+        if code_path.exists():
+            build_metadata.code_hash = sha256(
+                code_path.read_text().encode()
+            ).hexdigest()
 
     def get_paginated_arguments(self, notes: list[Note], limit: int):
         for offset in range(0, len(notes), limit):

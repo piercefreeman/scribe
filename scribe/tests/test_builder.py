@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from scribe.builder import WebsiteBuilder
-from scribe.metadata import NoteStatus
+from scribe.metadata import BuildMetadata, NoteStatus
 from scribe.models import TemplateArguments
 from scribe.note import Note
 
@@ -47,7 +47,7 @@ def test_build_static_no_overwrite_existing_file(builder: WebsiteBuilder, tmpdir
 
     test_file = static_path / "test.txt"
     test_file.write_text("Original content")
-    builder.build_static(static_path)
+    builder.build_static(static_path, BuildMetadata())
 
     assert test_file.read_text() == "Original content"
 

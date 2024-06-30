@@ -36,6 +36,11 @@ class FeaturedPhotoPayload(BaseModel):
         extra = "forbid"
 
 
+class BuildMetadata(BaseModel):
+    style_hash: str | None = None
+    code_hash: str | None = None
+
+
 class NoteMetadata(BaseModel):
     """
     Defines the post metadata that shouldn't be directly visible but drives different

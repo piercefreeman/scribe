@@ -11,21 +11,21 @@ content %}
         <div>
             <div class="group hover:-mt-[3px] hover:pb-[3px] transition-all">
                 <div
-                    class="relative border-4 border-white shadow-xl rounded-lg"
+                    class="relative border-4 border-white dark:border-slate-600 overflow-hidden shadow-xl rounded-lg"
                 >
                     <a href="./notes/{{note.webpage_path}}">
                         {% if note.featured_assets %}
                         <img
                             src="{{note.featured_assets[0].asset.remote_preview_path}}"
-                            class="rounded-lg object-cover h-96 w-full transition-all {% if note.featured_assets[0].cover == FeaturedPhotoPosition.CENTER %} object-center {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.LEFT %} object-left {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.RIGHT %} object-right {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.TOP %} object-top {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.BOTTOM %} object-bottom {% endif %}"
+                            class="object-cover h-96 w-full transition-all {% if note.featured_assets[0].cover == FeaturedPhotoPosition.CENTER %} object-center {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.LEFT %} object-left {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.RIGHT %} object-right {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.TOP %} object-top {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.BOTTOM %} object-bottom {% endif %}"
                         />
                         {% endif %}
 
                         <div
-                            class="absolute bottom-0 left-0 right-0 bg-white/50 backdrop-blur-lg py-4 px-4 rounded-md flex items-center"
+                            class="absolute bottom-0 left-0 right-0 bg-white/50 backdrop-blur-lg py-4 px-4 flex items-center"
                         >
                             <div
-                                class="grow text-gray-800 dark:text-gray-200 font-semibold text-xl"
+                                class="grow text-gray-800 font-semibold text-xl"
                             >
                                 {{note.title}}
                             </div>
