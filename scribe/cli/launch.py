@@ -63,7 +63,7 @@ def main(notes: str, output: str, port: int, env: str):
     environ["MARKDOWN_PATH"] = str(Path(notes).expanduser().absolute())
 
     # Launch the styling refresh system
-    scribe_root = get_asset_path('../').resolve().absolute()
+    scribe_root = get_asset_path("../").resolve().absolute()
     secho("Using scribe root: " + str(scribe_root), fg="yellow")
     style_process = Process(
         target=system,

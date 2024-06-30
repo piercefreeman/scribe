@@ -29,9 +29,12 @@ Home
             <a href="/notes/{{note.webpage_path}}">
                 <div class="group hover:-mt-[3px] hover:pb-[3px] transition-all duration-100">
                     <div class="py-2 {% if loop.index == 0 %} pt-0 {% endif %}">
-                        <div class="bg-indigo-500 text-white font-bold p-2 rounded flex items-center group-hover:shadow-md transition-all duration-100">
+                        <div class="bg-indigo-500 text-white font-bold p-2 rounded flex items-center group-hover:shadow-md transition-all duration-100 gap-x-2">
                             <p class="grow">{{note.title}}</p>
-                            <div class="bg-white rounded p-1 text-indigo-500 font-bold text-sm">{{note.metadata.date.strftime("%B %-d, %Y")}}</div>
+                            {%if note.visible_tag%}
+                            <div class="bg-white rounded py-1 px-2 text-indigo-500 font-bold text-sm">{{note.visible_tag}}</div>
+                            {%endif%}
+                            <div class="bg-white rounded py-1 px-2 text-indigo-500 font-bold text-sm">{{note.metadata.date.strftime("%B %-d, %Y")}}</div>
                         </div>
                     </div>
                     <article>

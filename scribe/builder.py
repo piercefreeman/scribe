@@ -9,7 +9,6 @@ from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
 from PIL.Image import Resampling
 
-from scribe.constants import SINGLE_PAGE_NOTE_LIMIT
 from scribe.io import get_asset_path
 from scribe.links import local_to_remote_links
 from scribe.metadata import FeaturedPhotoPosition, NoteStatus
@@ -80,7 +79,9 @@ class WebsiteBuilder:
 
         # Build the posts
         post_template_paths = ["post.html", "post-travel.html"]
-        post_templates = {path: self.env.get_template(path) for path in post_template_paths}
+        post_templates = {
+            path: self.env.get_template(path) for path in post_template_paths
+        }
         for note in notes:
             # Conditional post template based on tags
             post_template_path = "post.html"
@@ -148,7 +149,7 @@ class WebsiteBuilder:
         if not asset.local_preview_path.exists():
             # The image quality, on a scale from 1 (worst) to 95 (best)
             image = Image.open(asset.local_path)
-            #image.thumbnail((1600, maxsize), Resampling.LANCZOS)
+            # image.thumbnail((1600, maxsize), Resampling.LANCZOS)
             image.thumbnail((3200, maxsize), Resampling.LANCZOS)
             # image.save(preview_image_path, "JPEG", quality=95, dpi=(300, 300), subsampling=0)
             image.save(
@@ -156,7 +157,7 @@ class WebsiteBuilder:
                 quality=95,
                 dpi=(300, 300),
                 subsampling=2,  # Corresponds to 4:2:0
-                progressive=True
+                progressive=True,
             )
 
         # Copy the preview image

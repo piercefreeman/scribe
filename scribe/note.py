@@ -1,4 +1,5 @@
 from logging import warning
+from os import environ
 from pathlib import Path
 from re import sub
 
@@ -213,7 +214,9 @@ class Note:
             # Travel specific styling
             # TODO: Generalize
             if "travel" in self.metadata.tags:
-                image_classes.append("lg:max-w-[100vw] lg:-ml-[125px] lg:w-offset-content-image-lg")
+                image_classes.append(
+                    "lg:max-w-[100vw] lg:-ml-[125px] lg:w-offset-content-image-lg"
+                )
                 image_classes.append("xl:-ml-[250px] xl:w-offset-content-image-xl")
 
             img["class"] = " ".join(image_classes)
@@ -250,3 +253,10 @@ class Note:
         WPM = 238
         words = len(self.text.split())
         return (words // WPM) + 1
+
+    @property
+    def visible_tag(self):
+        # Only show post status during development
+        if environ["SCRIBE_ENVIRONMENT"] == "DEVELOPMENT":
+            return str(self.metadata.status.value)
+        return None
