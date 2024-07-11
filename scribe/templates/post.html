@@ -5,19 +5,18 @@ content %}
 <div
     class="mx-auto mt-6 px-4 pb-8 sm:max-w-2xl md:max-w-3xl md:px-8 lg:max-w-4xl lg:px-0 xl:max-w-5xl"
 >
-    <article class="bg-blue-400 px-6 py-4 rounded">
-        <div class="w-full px-4 lg:w-[650px] xl:w-[700px]">
-            <h1
-                class="block text-4xl font-medium tracking-normal text-white md:text-5xl"
-            >
-                {{header}}
-            </h1>
-        </div>
-    </article>
-
     <div class="flex justify-center">
         <div class="w-full px-4 lg:w-[650px] xl:w-[700px]" id="content-raw">
             <article>
+                <h1
+                    class="block text-4xl font-medium tracking-normal md:text-5xl dark:text-white"
+                >
+                    <span
+                        class="bg-transparent font-extrabold shadow-[inset_0_-0.5em_0_0_rgba(96,165,250,0.50)]"
+                        >{{header}}</span
+                    >
+                </h1>
+
                 <div class="mt-4 text-lg text-gray-300">
                     <h6># {{metadata.date.strftime("%B %-d, %Y")}}</h6>
                 </div>
@@ -26,6 +25,19 @@ content %}
                 >
                     {{content|safe}}
                 </div>
+
+                {%if metadata.tags %}
+                <div
+                    class="article-large prose prose-img:m-0 dark:prose-invert mt-4 max-w-none"
+                >
+                    Related tags:
+                    <div>
+                        {% for tag in metadata.tags %}
+                        <span>#{{tag}} </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
             </article>
         </div>
         <div
@@ -41,6 +53,42 @@ content %}
                 </div>
             </template>
         </div>
+    </div>
+
+    <div class="px-4 mt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+        {% for relevant_note in relevant_notes %}
+        <div class="border-l-8 pl-4 border-blue-500">
+            <div class="py-4">
+                <div class="font-bold">{{relevant_note.title}}</div>
+                <div class="mt-4">{{relevant_note.metadata.subtitle[0]}}</div>
+                <div class="mt-2">
+                    <a
+                        href="/notes/{{relevant_note.webpage_path}}.html"
+                        class="font-medium text-blue-500"
+                    >
+                        <div class="flex">
+                            <span>Read</span>
+                            <span
+                                ><svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    aria-hidden="true"
+                                    data-slot="icon"
+                                    class="h-6 w-6"
+                                >
+                                    <path
+                                        fill-rule="evenodd"
+                                        d="M2 10a.75.75 0 0 1 .75-.75h12.59l-2.1-1.95a.75.75 0 1 1 1.02-1.1l3.5 3.25a.75.75 0 0 1 0 1.1l-3.5 3.25a.75.75 0 1 1-1.02-1.1l2.1-1.95H2.75A.75.75 0 0 1 2 10Z"
+                                        clip-rule="evenodd"
+                                    ></path></svg
+                            ></span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
     </div>
 </div>
 

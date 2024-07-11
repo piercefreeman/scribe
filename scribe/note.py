@@ -230,24 +230,7 @@ class Note:
         return self.text.find("[^") != -1
 
     def get_preview(self):
-        html = markdown(
-            self.text,
-            extensions=[
-                CodeHiliteExtension(use_pygments=True),
-                FencedCodeExtension(),
-                FootnoteExtension(BACKLINK_TEXT="↢"),
-                TableExtension(),
-            ],
-        )
-
-        content = BeautifulSoup(html, "html.parser")
-
-        # remove classes with codehilite
-        for code in content.find_all("code"):
-            code.decompose()
-
-        # Return just the text
-        return content.get_text()[:1000]
+        return "\n".join(self.metadata.subtitle)
 
     @property
     def read_time_minutes(self):
