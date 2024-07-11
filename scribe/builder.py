@@ -1,7 +1,9 @@
+from collections import defaultdict
 from dataclasses import asdict, replace
 from hashlib import sha256
 from os import getenv
 from pathlib import Path
+from random import sample
 from shutil import copyfile
 from sys import maxsize
 
@@ -86,12 +88,28 @@ class WebsiteBuilder:
             for asset in note.assets:
                 self.process_asset(asset, output_path=output_path)
 
+        # For each tag, sample related posts (up to 3 total)
+        notes_by_tag = defaultdict(list)
+        for note in notes:
+            for tag in note.metadata.tags:
+                notes_by_tag[tag.lower()].append(note)
+
         # Build the posts
         post_template_paths = ["post.html", "post-travel.html"]
         post_templates = {
             path: self.env.get_template(path) for path in post_template_paths
         }
         for note in notes:
+            possible_notes = list(
+                {
+                    candidate_note
+                    for tag, all_notes in notes_by_tag.items()
+                    for candidate_note in all_notes
+                    if tag in note.metadata.tags and candidate_note != note
+                }
+            )
+            relevant_notes = sample(possible_notes, min(3, len(possible_notes)))
+
             # Conditional post template based on tags
             post_template_path = "post.html"
             if "travel" in note.metadata.tags:
@@ -106,6 +124,7 @@ class WebsiteBuilder:
                         content=note.get_html(),
                         has_footnotes=note.has_footnotes(),
                         build_metadata=build_metadata,
+                        relevant_notes=relevant_notes,
                     )
                 )
 

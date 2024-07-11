@@ -2,6 +2,8 @@ from itertools import chain
 from pathlib import Path
 from re import escape as re_escape, finditer, sub
 
+from click import secho
+
 from scribe.note import Note
 
 
@@ -58,6 +60,9 @@ def local_to_remote_links(
 
         filename = Path(local_link).with_suffix("").name
         if filename not in path_to_remote:
+            secho("Available paths:")
+            for filename, path in path_to_remote.items():
+                secho(f"{path}: `{filename}`")
             raise ValueError(
                 f"Incorrect link\n Problem Note: {note.filename}\n Link not found locally: {match.group(0)}"
             )
