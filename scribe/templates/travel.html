@@ -1,9 +1,7 @@
 {% extends "base.html" %} {% block title %} Travel {% endblock %} {% block
 content %}
 
-<div
-    class="mt-8 max-w-6xl mx-auto px-4 text-gray-900 dark:text-gray-100 text-base pb-8"
->
+<div class="max-w-2xl">
     <div class="grid md:grid-cols-2 gap-8">
         {% for note in filter_tag(notes, "travel") %}
         <div>
@@ -15,16 +13,14 @@ content %}
                         {% if note.featured_assets %}
                         <img
                             src="{{note.featured_assets[0].asset.remote_preview_path}}"
-                            class="object-cover h-96 w-full transition-all {% if note.featured_assets[0].cover == FeaturedPhotoPosition.CENTER %} object-center {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.LEFT %} object-left {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.RIGHT %} object-right {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.TOP %} object-top {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.BOTTOM %} object-bottom {% endif %}"
+                            class="object-cover aspect-video w-full transition-all {% if note.featured_assets[0].cover == FeaturedPhotoPosition.CENTER %} object-center {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.LEFT %} object-left {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.RIGHT %} object-right {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.TOP %} object-top {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.BOTTOM %} object-bottom {% endif %}"
                         />
                         {% endif %}
 
                         <div
                             class="absolute bottom-0 left-0 right-0 bg-white/50 backdrop-blur-lg py-4 px-4 flex items-center"
                         >
-                            <div
-                                class="grow text-gray-800 font-semibold text-xl"
-                            >
+                            <div class="grow text-gray-800 font-semibold">
                                 {{note.title}}
                             </div>
                             <div class="text-gray-700">
