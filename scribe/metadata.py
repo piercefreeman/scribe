@@ -53,6 +53,8 @@ class NoteMetadata(BaseModel):
     status: NoteStatus = NoteStatus.SCRATCH
     subtitle: list[str] = []
 
+    external_link: str | None = None
+
     # Featured photos are paths to photos that should be featured in photo sections
     # They can be separate from those that are contained in the body of the post
     featured_photos: list[str | FeaturedPhotoPayload] = []

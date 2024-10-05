@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block
+    content %}
+    <div class="max-w-2xl">
+        <div class="flex items-center font-semibold text-gray-600 dark:text-gray-400">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 viewBox="0 0 24 24"
+                 fill="currentColor"
+                 class="h-4 w-4">
+                <path fill-rule="evenodd" d="M5.25 2.25a3 3 0 00-3 3v4.318a3 3 0 00.879 2.121l9.58 9.581c.92.92 2.39 1.186 3.548.428a18.849 18.849 0 005.441-5.44c.758-1.16.492-2.629-.428-3.548l-9.58-9.581a3 3 0 00-2.122-.879H5.25zM6.375 7.5a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25z" clip-rule="evenodd" />
+            </svg>
+            <div class="ml-1">Active</div>
+        </div>
+        <div class="mt-4 space-y-4">
+            <div>
+                <div>
+                    <a class="font-medium text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                       href="https://github.com/piercefreeman/mountaineer">mountaineer</a>
+                </div>
+                <div>
+                    Mountaineer is a batteries-included web framework for Python. It
+                    gives you typehinting up and down the stack: from database to
+                    frontend. It also supports full V8 server-side rendering,
+                    application configuration, native Typescript integrations, and a
+                    build pipeline written in Rust.
+                </div>
+            </div>
+            <div>
+                <div>
+                    <a class="font-medium text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                       href="https://github.com/piercefreeman/scribe">scribe</a>
+                </div>
+                <div>
+                    Simple static-site generator that powers this site. Nothing
+                    fancy, but fast and built exactly for my workflow. I wrote a bit
+                    about it
+                    <a href="/notes/architecting-a-blog"
+                       class="text-blue-500 hover:text-blue-600">here</a>.
+                </div>
+            </div>
+        </div>
+        <div class="mt-8 py-6">
+            <div class="flex items-center font-semibold text-gray-600 dark:text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     viewBox="0 0 24 24"
+                     fill="currentColor"
+                     class="h-4 w-4">
+                    <path fill-rule="evenodd" d="M5.25 2.25a3 3 0 00-3 3v4.318a3 3 0 00.879 2.121l9.58 9.581c.92.92 2.39 1.186 3.548.428a18.849 18.849 0 005.441-5.44c.758-1.16.492-2.629-.428-3.548l-9.58-9.581a3 3 0 00-2.122-.879H5.25zM6.375 7.5a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25z" clip-rule="evenodd" />
+                </svg>
+                <div class="ml-1">Previous</div>
+            </div>
+            <div class="mt-4 space-y-4">
+                <div>
+                    <div>
+                        <a class="font-medium text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                           href="https://github.com/piercefreeman/gpt-json">gpt-json</a>
+                    </div>
+                    <div>
+                        gpt-json provides schema definition and validation for the
+                        GPT line of models, for use in data pipelines and structured
+                        reasoning.
+                    </div>
+                </div>
+                <div>
+                    <div>
+                        <a class="font-medium text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                           href="https://github.com/piercefreeman/vectordb-orm">vectordb-orm</a>
+                    </div>
+                    <div>
+                        vectordb-orm is a small ORM wrapper on top of vector
+                        databases. It allows for easier model definition as Python
+                        objects and abstracts the backend details. Currently
+                        supporting Milvus and Pinecone.
+                    </div>
+                </div>
+                <div>
+                    <div>
+                        <a class="font-medium text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                           href="https://github.com/piercefreeman/dagorama">dagorama</a>
+                    </div>
+                    <div>
+                        Dagorama is a simple daemon library for Python. It's a
+                        hybrid between Celery and Dask, where tasks can be chained
+                        together but run on different machines in parallel. Work in
+                        Progress.
+                    </div>
+                </div>
+                <div>
+                    <div>
+                        <a class="font-medium text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                           href="https://github.com/piercefreeman/grooveproxy">groove</a>
+                    </div>
+                    <div>
+                        Groove is a MITM proxy specifically optimized for web
+                        crawling and unit test construction. The core logic is
+                        written in Go and provides an API client in Python. It
+                        allows customization of cache handling, request recording,
+                        3rd party routing, and TLS fingerprinting.
+                    </div>
+                </div>
+                <div>
+                    <div>
+                        <a class="font-medium text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                           href="https://github.com/piercefreeman/docker/tree/main/headfull-chromium">headfull-chromium</a>
+                    </div>
+                    <div>
+                        Headfull Chrome is a docker image for easier web crawling
+                        that integrates font packages, display virtualization, and
+                        remote control. It makes it easier to develop web automation
+                        that mirrors how you use a browser. For more background, see
+                        <a class="text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                           href="/notes/headfull-browsers-beat-headless">the post</a>
+                        on motivations.
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endblock %}
+</div>

@@ -34,7 +34,7 @@ module.exports = {
     extend: {
       width: {
         "offset-content-image-lg": "calc(100% + 250px)",
-        "offset-content-image-xl": "calc(100% + 500px)",
+        "offset-content-image-xl": "calc(100% + 400px)",
       },
       typography: ({ theme }) => ({
         DEFAULT: {
