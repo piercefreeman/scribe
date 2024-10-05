@@ -109,7 +109,9 @@ class WebsiteBuilder:
                     candidate_note
                     for tag, all_notes in notes_by_tag.items()
                     for candidate_note in all_notes
-                    if tag in note.metadata.tags and candidate_note != note
+                    if tag in note.metadata.tags
+                    and candidate_note != note
+                    and not note.metadata.external_link
                 }
             )
             relevant_notes = sample(possible_notes, min(3, len(possible_notes)))
