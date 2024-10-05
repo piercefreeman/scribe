@@ -74,6 +74,10 @@ class WebsiteBuilder:
                     "travel.html",
                     TemplateArguments(notes=filter_tag(published_notes, "travel")),
                 ),
+                PageDefinition(
+                    "opensource.html",
+                    "opensource.html",
+                ),
                 PageDefinition("about.html", "about.html"),
             ],
             output_path,

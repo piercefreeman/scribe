@@ -1,15 +1,14 @@
 {% extends "base.html" %} {% block title %} {{header}} {% endblock %} {% block
 content %}
-<div>{%include "logo.html"%}</div>
 
 <div
-    class="mx-auto mt-6 px-4 pb-8 sm:max-w-2xl md:max-w-3xl md:px-8 lg:max-w-4xl lg:px-0 xl:max-w-5xl"
+    class="mt-6 px-4 pb-8 sm:max-w-xl md:max-w-2xl md:px-8 lg:max-w-3xl lg:px-0 xl:max-w-4xl"
 >
     <div class="flex justify-center">
-        <div class="w-full px-4 lg:w-[650px] xl:w-[700px]" id="content-raw">
+        <div class="w-full px-4 lg:w-[550px] xl:w-[600px]" id="content-raw">
             <article>
                 <h1
-                    class="block text-4xl font-medium tracking-normal md:text-5xl dark:text-white"
+                    class="block text-3xl font-medium tracking-normal md:text-4xl dark:text-white"
                 >
                     <span
                         class="bg-transparent font-extrabold shadow-[inset_0_-0.5em_0_0_rgba(96,165,250,0.50)]"
@@ -17,18 +16,18 @@ content %}
                     >
                 </h1>
 
-                <div class="mt-4 text-lg text-gray-300">
+                <div class="mt-4 text-gray-300">
                     <h6># {{metadata.date.strftime("%B %-d, %Y")}}</h6>
                 </div>
                 <div
-                    class="article-large prose prose-img:m-0 dark:prose-invert mt-4 max-w-none"
+                    class="text-sm leading-5 prose prose-img:m-0 dark:prose-invert mt-4 max-w-none"
                 >
                     {{content|safe}}
                 </div>
 
                 {%if metadata.tags %}
                 <div
-                    class="article-large prose prose-img:m-0 dark:prose-invert mt-4 max-w-none"
+                    class="text-sm leading-5 prose prose-img:m-0 dark:prose-invert mt-4 max-w-none"
                 >
                     Related tags:
                     <div>
@@ -47,7 +46,7 @@ content %}
             <!-- Inline footnotes -->
             <template id="footnote-template">
                 <div
-                    class="prose dark:prose-invert border-l-4 pl-2 text-slate-400"
+                    class="text-sm leading-5 prose dark:prose-invert border-l-4 pl-2 text-slate-400"
                 >
                     {CONTENT}
                 </div>
