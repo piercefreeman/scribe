@@ -1,6 +1,4 @@
-<div
-    class="sm:max-w-2xl md:max-w-3xl md:px-8 lg:max-w-4xl lg:px-0 xl:max-w-5xl"
->
+<div class="sm:max-w-2xl md:max-w-3xl md:px-8 lg:max-w-4xl lg:px-0 xl:max-w-5xl">
     <div class="bg-gray-900 px-4 py-8 dark:bg-gray-200 rounded-2xl m-8">
         <div class="mx-auto sm:max-w-2xl">
             <div class="text-sml text-gray-200 dark:text-gray-900">
@@ -15,30 +13,22 @@
                     month, maximum.
                 </p>
             </div>
-
             <form id="newsletter-form">
                 <div class="mt-4 flex gap-x-4">
-                    <label htmlFor="email-address" class="sr-only">
-                        Email address
-                    </label>
-                    <input
-                        id="email-address"
-                        name="email_address"
-                        type="email"
-                        autocomplete="email"
-                        required
-                        class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 dark:text-gray-900 dark:ring-inset dark:ring-gray-300 dark:focus:ring-indigo-500"
-                        placeholder="Type your email..."
-                    />
-                    <button
-                        type="submit"
-                        class="flex-none rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                    >
+                    <label htmlFor="email-address" class="sr-only">Email address</label>
+                    <input id="email-address"
+                           name="email_address"
+                           type="email"
+                           autocomplete="email"
+                           required
+                           class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 dark:text-gray-900 dark:ring-inset dark:ring-gray-300 dark:focus:ring-indigo-500"
+                           placeholder="Type your email..." />
+                    <button type="submit"
+                            class="flex-none rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">
                         Subscribe
                     </button>
                 </div>
             </form>
-
             <div id="form-result" class="mt-4 hidden">
                 <div id="form-success" class="text-green-600"></div>
                 <div id="form-error" class="text-red-600"></div>
@@ -46,7 +36,6 @@
         </div>
     </div>
 </div>
-
 <script type="text/javascript">
     const form = document.getElementById("newsletter-form");
     const formResult = document.getElementById("form-result");
