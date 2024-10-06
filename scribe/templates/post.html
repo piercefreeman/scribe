@@ -17,52 +17,54 @@
                         <div class="text-sm leading-5 prose prose-img:m-0 dark:prose-invert mt-4 max-w-none">
                             Related tags:
                             <div>
-                                {% for tag in metadata.tags %}<span>#{{ tag }}</span>{% endfor %}
+                                {% for tag in metadata.tags %}
+                                    <span>#{{ tag }}</span>{%
+                                    endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </article>
+                </div>
+                <div class="{% if has_footnotes %}lg:block lg:grow{% endif %} relative hidden"
+                     id="footnotes-inline">
+                    <!-- Inline footnotes -->
+                    <template id="footnote-template">
+                        <div class="text-sm leading-5 prose dark:prose-invert border-l-4 pl-2 text-slate-400">{CONTENT}</div>
+                    </template>
+                </div>
+            </div>
+            <div class="px-4 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {% for relevant_note in relevant_notes %}
+                    <div class="border-l-8 pl-4 border-blue-500 dark:text-gray-100">
+                        <div class="py-4">
+                            <div class="font-bold">{{ relevant_note.title }}</div>
+                            <div class="mt-4">{{ relevant_note.metadata.subtitle[0] }}</div>
+                            <div class="mt-2">
+                                <a href="/notes/{{ relevant_note.webpage_path }}.html"
+                                   class="font-medium text-blue-500">
+                                    <div class="flex">
+                                        <span>Read</span>
+                                        <span>
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 viewBox="0 0 20 20"
+                                                 fill="currentColor"
+                                                 aria-hidden="true"
+                                                 data-slot="icon"
+                                                 class="h-6 w-6">
+                                                <path fill-rule="evenodd" d="M2 10a.75.75 0 0 1 .75-.75h12.59l-2.1-1.95a.75.75 0 1 1 1.02-1.1l3.5 3.25a.75.75 0 0 1 0 1.1l-3.5 3.25a.75.75 0 1 1-1.02-1.1l2.1-1.95H2.75A.75.75 0 0 1 2 10Z" clip-rule="evenodd">
+                                                </path>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                </a>
                             </div>
                         </div>
-                    {% endif %}
-                </article>
-            </div>
-            <div class="{% if has_footnotes %}lg:block lg:grow{% endif %} relative hidden"
-                 id="footnotes-inline">
-                <!-- Inline footnotes -->
-                <template id="footnote-template">
-                    <div class="text-sm leading-5 prose dark:prose-invert border-l-4 pl-2 text-slate-400">{CONTENT}</div>
-                </template>
-            </div>
-        </div>
-        <div class="px-4 mt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-            {% for relevant_note in relevant_notes %}
-                <div class="border-l-8 pl-4 border-blue-500 dark:text-gray-100">
-                    <div class="py-4">
-                        <div class="font-bold">{{ relevant_note.title }}</div>
-                        <div class="mt-4">{{ relevant_note.metadata.subtitle[0] }}</div>
-                        <div class="mt-2">
-                            <a href="/notes/{{ relevant_note.webpage_path }}.html"
-                               class="font-medium text-blue-500">
-                                <div class="flex">
-                                    <span>Read</span>
-                                    <span>
-                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                             viewBox="0 0 20 20"
-                                             fill="currentColor"
-                                             aria-hidden="true"
-                                             data-slot="icon"
-                                             class="h-6 w-6">
-                                            <path fill-rule="evenodd" d="M2 10a.75.75 0 0 1 .75-.75h12.59l-2.1-1.95a.75.75 0 1 1 1.02-1.1l3.5 3.25a.75.75 0 0 1 0 1.1l-3.5 3.25a.75.75 0 1 1-1.02-1.1l2.1-1.95H2.75A.75.75 0 0 1 2 10Z" clip-rule="evenodd">
-                                            </path>
-                                        </svg>
-                                    </span>
-                                </div>
-                            </a>
-                        </div>
                     </div>
-                </div>
-            {% endfor %}
+                {% endfor %}
+            </div>
         </div>
-    </div>
-    {% include "subscribe.html" %}
-    <script type="text/javascript">
+        {% include "subscribe.html" %}
+        <script type="text/javascript">
     const contentRaw = document.getElementById("content-raw");
     const footnotes = document.getElementById("footnotes-inline");
     const footnoteTemplate = document.getElementById("footnote-template");
@@ -125,8 +127,8 @@
 
     // Call the function on initial load
     updateFootnotes();
-    </script>
-    <style>
+        </script>
+        <style>
     /*
      * md: 	@media (min-width: 768px) { ... }
      * lg: @media (min-width: 1024px) { ... }
@@ -136,5 +138,5 @@
             display: none;
         }
     }
-    </style>
-{% endblock %}
+        </style>
+    {% endblock %}
