@@ -2,7 +2,7 @@
 {% block title %}Home{% endblock %}
 {% block content %}
     <div class="lg:w-[550px] xl:w-[600px]">
-        <div class="mt-4 space-y-4">
+        <div class="space-y-4">
             {% for note in filter_tag(notes, "!travel") %}
                 <div>
                     <div class="group">
