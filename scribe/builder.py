@@ -75,8 +75,8 @@ class WebsiteBuilder:
                     TemplateArguments(notes=filter_tag(published_notes, "travel")),
                 ),
                 PageDefinition(
-                    "opensource.html",
-                    "opensource.html",
+                    "projects.html",
+                    "projects.html",
                 ),
                 PageDefinition("about.html", "about.html"),
             ],
