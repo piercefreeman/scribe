@@ -41,6 +41,7 @@ class WebsiteBuilder:
         (output_path / "images").mkdir(exist_ok=True)
 
         all_notes = self.get_notes(notes_path)
+
         # When developing locally it's nice to preview draft notes on the homepage as they will look live
         # But require this as an explicit env variable
         if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
@@ -92,9 +93,20 @@ class WebsiteBuilder:
             for asset in note.assets:
                 self.process_asset(asset, output_path=output_path)
 
+        # When developing locally it's nice to preview draft notes on the homepage as they will look live
+        # But require this as an explicit env variable
+        if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
+            published_notes = notes
+        else:
+            published_notes = [
+                note
+                for note in notes
+                if note.metadata.status == NoteStatus.PUBLISHED
+            ]
+
         # For each tag, sample related posts (up to 3 total)
         notes_by_tag = defaultdict(list)
-        for note in notes:
+        for note in published_notes:
             for tag in note.metadata.tags:
                 notes_by_tag[tag.lower()].append(note)
 
