@@ -5,7 +5,6 @@ from scribe.metadata import BuildMetadata, NoteStatus
 from scribe.models import TemplateArguments
 from scribe.note import Note
 
-
 SCRATCH_NOTE = """
 # Scratch Note
 
@@ -73,9 +72,7 @@ def test_get_paginated_arguments_no_notes(builder: WebsiteBuilder):
     assert result == []
 
 
-def test_get_paginated_arguments_single_page(
-    builder: WebsiteBuilder, published_note: Note
-):
+def test_get_paginated_arguments_single_page(builder: WebsiteBuilder, published_note: Note):
     notes = [published_note] * 3
     limit = 5
     result = list(builder.get_paginated_arguments(notes, limit))
@@ -83,9 +80,7 @@ def test_get_paginated_arguments_single_page(
     assert len(result[0].notes) == 3
 
 
-def test_get_paginated_arguments_multiple_pages(
-    builder: WebsiteBuilder, published_note: Note
-):
+def test_get_paginated_arguments_multiple_pages(builder: WebsiteBuilder, published_note: Note):
     notes = [published_note] * 7
     limit = 5
     result = list(builder.get_paginated_arguments(notes, limit))
@@ -100,18 +95,14 @@ def test_augment_page_directions_no_offset_limit(builder: WebsiteBuilder):
     assert result.directions is None
 
 
-def test_augment_page_directions_first_page(
-    builder: WebsiteBuilder, published_note: Note
-):
+def test_augment_page_directions_first_page(builder: WebsiteBuilder, published_note: Note):
     arguments = TemplateArguments(notes=[published_note] * 10, offset=0, limit=5)
     result = builder.augment_page_directions(arguments)
     assert len(result.directions) == 1
     assert result.directions[0].direction == "next"
 
 
-def test_augment_page_directions_middle_page(
-    builder: WebsiteBuilder, published_note: Note
-):
+def test_augment_page_directions_middle_page(builder: WebsiteBuilder, published_note: Note):
     arguments = TemplateArguments(notes=[published_note] * 15, offset=5, limit=5)
     result = builder.augment_page_directions(arguments)
     assert len(result.directions) == 2

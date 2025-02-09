@@ -1,6 +1,7 @@
 from itertools import chain
 from pathlib import Path
-from re import escape as re_escape, finditer, sub
+from re import escape as re_escape
+from re import finditer, sub
 
 from click import secho
 

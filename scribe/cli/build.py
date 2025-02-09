@@ -5,6 +5,8 @@ from shutil import rmtree
 
 from click import (
     Path as ClickPath,
+)
+from click import (
     command,
     option,
     secho,

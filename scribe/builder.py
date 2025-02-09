@@ -48,9 +48,7 @@ class WebsiteBuilder:
             published_notes = all_notes
         else:
             published_notes = [
-                note
-                for note in all_notes
-                if note.metadata.status == NoteStatus.PUBLISHED
+                note for note in all_notes if note.metadata.status == NoteStatus.PUBLISHED
             ]
 
         build_metadata = BuildMetadata()
@@ -64,12 +62,8 @@ class WebsiteBuilder:
         self.build_notes(all_notes, output_path, build_metadata)
         self.build_pages(
             [
-                PageDefinition(
-                    "home.html", "index.html", TemplateArguments(notes=published_notes)
-                ),
-                PageDefinition(
-                    "rss.xml", "rss.xml", TemplateArguments(notes=published_notes)
-                ),
+                PageDefinition("home.html", "index.html", TemplateArguments(notes=published_notes)),
+                PageDefinition("rss.xml", "rss.xml", TemplateArguments(notes=published_notes)),
                 PageDefinition(
                     "travel.html",
                     "travel.html",
@@ -85,9 +79,7 @@ class WebsiteBuilder:
             build_metadata,
         )
 
-    def build_notes(
-        self, notes: list[Note], output_path: Path, build_metadata: BuildMetadata
-    ):
+    def build_notes(self, notes: list[Note], output_path: Path, build_metadata: BuildMetadata):
         # Upload the note assets
         for note in notes:
             for asset in note.assets:
@@ -99,9 +91,7 @@ class WebsiteBuilder:
             published_notes = notes
         else:
             published_notes = [
-                note
-                for note in notes
-                if note.metadata.status == NoteStatus.PUBLISHED
+                note for note in notes if note.metadata.status == NoteStatus.PUBLISHED
             ]
 
         # For each tag, sample related posts (up to 3 total)
@@ -112,9 +102,7 @@ class WebsiteBuilder:
 
         # Build the posts
         post_template_paths = ["post.html", "post-travel.html"]
-        post_templates = {
-            path: self.env.get_template(path) for path in post_template_paths
-        }
+        post_templates = {path: self.env.get_template(path) for path in post_template_paths}
         for note in notes:
             possible_notes = list(
                 {
@@ -161,9 +149,7 @@ class WebsiteBuilder:
             page_args = self.augment_page_directions(page_args)
 
             with open(output_path / page.url, "w") as file:
-                file.write(
-                    template.render(**asdict(page_args), build_metadata=build_metadata)
-                )
+                file.write(template.render(**asdict(page_args), build_metadata=build_metadata))
 
     def build_rss(self, notes, output_path):
         # Limit to just published notes
@@ -171,7 +157,7 @@ class WebsiteBuilder:
 
         # Build RSS feed
         rss_template = self.env.get_template("rss.xml")
-        with open(output_path / f"rss.xml", "w") as file:
+        with open(output_path / "rss.xml", "w") as file:
             file.write(
                 rss_template.render(
                     notes=notes,
@@ -193,13 +179,9 @@ class WebsiteBuilder:
         style_path = static_path / "style.css"
         code_path = static_path / "code.css"
         if style_path.exists():
-            build_metadata.style_hash = sha256(
-                style_path.read_text().encode()
-            ).hexdigest()
+            build_metadata.style_hash = sha256(style_path.read_text().encode()).hexdigest()
         if code_path.exists():
-            build_metadata.code_hash = sha256(
-                code_path.read_text().encode()
-            ).hexdigest()
+            build_metadata.code_hash = sha256(code_path.read_text().encode()).hexdigest()
 
     def get_paginated_arguments(self, notes: list[Note], limit: int):
         for offset in range(0, len(notes), limit):
@@ -253,9 +235,7 @@ class WebsiteBuilder:
         has_previous = page_index > 0
 
         directions = []
-        directions += (
-            [PageDirection("previous", page_index - 1)] if has_previous else []
-        )
+        directions += [PageDirection("previous", page_index - 1)] if has_previous else []
         directions += [PageDirection("next", page_index + 1)] if has_next else []
 
         return replace(
@@ -280,9 +260,7 @@ class WebsiteBuilder:
         if found_error:
             exit()
 
-        path_to_remote = {
-            note.filename: f"/notes/{note.webpage_path}" for note in notes
-        }
+        path_to_remote = {note.filename: f"/notes/{note.webpage_path}" for note in notes}
 
         for note in notes:
             note.text = local_to_remote_links(note, path_to_remote)
