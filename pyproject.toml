@@ -6,7 +6,6 @@ authors = [
     { name = "Pierce Freeman", email = "pierce@freeman.vc" }
 ]
 license = "MIT"
-requires-python = "^3.10"
 
 dependencies = [
     "jinja2>=3.1.2",
