@@ -5,47 +5,43 @@ from os import getenv
 from pathlib import Path
 from random import sample
 from shutil import copyfile
-from sys import exit
-from sys import maxsize
-import json
-from datetime import datetime
-from typing import Dict, Optional, Set
+from sys import exit, maxsize
+from typing import Set
 
-from rich.console import Console
-from rich.tree import Tree
 from click import secho
 from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
 from PIL.Image import Resampling
+from rich.console import Console
+from rich.tree import Tree
 
+from scribe.exceptions import HandledBuildError
 from scribe.io import get_asset_path
 from scribe.links import local_to_remote_links
 from scribe.metadata import BuildMetadata, FeaturedPhotoPosition, NoteStatus
 from scribe.models import PageDefinition, PageDirection, TemplateArguments
 from scribe.note import Asset, Note
 from scribe.parsers import InvalidMetadataException
-from scribe.exceptions import HandledBuildError
 from scribe.template_utilities import filter_tag, group_by_month
-
 
 console = Console()
 
 
 class BuildState:
     """Tracks which files have been built in the current process"""
-    
+
     def __init__(self):
         # Set of files that have been successfully built
         self.built_files: Set[str] = set()
-        
+
     def needs_rebuild(self, file_path: Path) -> bool:
         """Check if a file needs to be rebuilt"""
         return str(file_path) not in self.built_files
-        
+
     def mark_built(self, file_path: Path):
         """Mark a file as successfully built"""
         self.built_files.add(str(file_path))
-        
+
     def clear(self):
         """Clear all build state"""
         self.built_files.clear()
@@ -60,20 +56,20 @@ class WebsiteBuilder:
         self.env.globals["filter_tag"] = filter_tag
         self.env.globals["group_by_month"] = group_by_month
         self.env.globals["FeaturedPhotoPosition"] = FeaturedPhotoPosition
-        
+
         # Initialize build state
         self.build_state = BuildState()
 
     def build(self, notes_path: str | Path, output_path: str | Path):
         notes_path = Path(notes_path).expanduser()
         output_path = Path(output_path).expanduser()
-        
+
         output_path.mkdir(exist_ok=True)
         (output_path / "notes").mkdir(exist_ok=True)
         (output_path / "images").mkdir(exist_ok=True)
 
         all_notes = self.get_notes(notes_path)
-        
+
         # When developing locally it's nice to preview draft notes on the homepage as they will look live
         # But require this as an explicit env variable
         if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
@@ -137,14 +133,14 @@ class WebsiteBuilder:
         post_templates = {path: self.env.get_template(path) for path in post_template_paths}
         for note in notes:
             output_file = output_path / "notes" / f"{note.webpage_path}.html"
-            
+
             # Skip if already built and source hasn't changed
             if not self.build_state.needs_rebuild(note.path):
                 secho(f"Skipping {note.title} - already built", fg="green")
                 continue
-                
+
             secho(f"Building {note.title}", fg="yellow")
-            
+
             possible_notes = list(
                 {
                     candidate_note
@@ -174,7 +170,7 @@ class WebsiteBuilder:
                         relevant_notes=relevant_notes,
                     )
                 )
-            
+
             # Mark as successfully built
             self.build_state.mark_built(note.path)
 
@@ -239,7 +235,7 @@ class WebsiteBuilder:
         # Skip if already processed
         if not self.build_state.needs_rebuild(asset.local_path):
             return
-            
+
         # Don't process preview files separately, process as part of their main asset package
         # Compress the assets if we don't already have a compressed version
         if not asset.local_preview_path.exists():
@@ -266,7 +262,7 @@ class WebsiteBuilder:
         remote_path = output_path / f"./{asset.remote_path}"
         if not remote_path.exists():
             copyfile(asset.local_path, remote_path)
-            
+
         # Mark as successfully processed
         self.build_state.mark_built(asset.local_path)
 
@@ -306,13 +302,13 @@ class WebsiteBuilder:
             # Skip hidden directories (those starting with .)
             if any(part.startswith(".") for part in path.parts):
                 continue
-                
+
             if path.suffix == ".md":
                 try:
                     note = Note.from_file(path)
                     if note.metadata.status in {NoteStatus.DRAFT, NoteStatus.PUBLISHED}:
                         notes.append(note)
-                        
+
                         # Add to the tree visualization
                         relative_path = path.relative_to(notes_path)
                         parent_path = str(relative_path.parent)

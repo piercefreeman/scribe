@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import datetime
 from re import findall, sub
 from typing import Any
 
@@ -13,21 +12,25 @@ from scribe.metadata import NoteMetadata
 
 class InvalidMetadataException(Exception):
     """Base exception for metadata validation failures."""
+
     pass
 
 
 class NoTitleException(InvalidMetadataException):
     """Raised when a note has no title (# header) specified."""
+
     pass
 
 
 class MissingMetadataBlockException(InvalidMetadataException):
     """Raised when a note is missing the metadata block entirely."""
+
     pass
 
 
 class InvalidMetadataFormatException(InvalidMetadataException):
     """Raised when metadata format/content is invalid."""
+
     pass
 
 

@@ -7,7 +7,7 @@ def backup_file(file_path: Path) -> Path:
     """
     Creates a backup of a file in a hidden .scribe_backups directory.
     Returns the path to the backup file.
-    
+
     Will not backup files that are already in a .scribe_backups directory
     to prevent recursive backups.
     """
@@ -26,4 +26,4 @@ def backup_file(file_path: Path) -> Path:
 
     # Copy the file
     copy2(file_path, backup_path)
-    return backup_path 
+    return backup_path

@@ -1,7 +1,6 @@
 from multiprocessing import Process
 from os import environ, system
 from pathlib import Path
-from time import sleep
 
 from click import (
     Path as ClickPath,
@@ -11,11 +10,11 @@ from click import (
     option,
     secho,
 )
-from watchfiles import watch, Change
+from watchfiles import Change, watch
 
+from scribe.builder import WebsiteBuilder
 from scribe.cli.runserver import runserver
 from scribe.io import get_asset_path
-from scribe.builder import WebsiteBuilder
 
 
 class NotesBuilder:
@@ -25,23 +24,23 @@ class NotesBuilder:
         self.env = env
         self.builder = WebsiteBuilder()
         self.scribe_path = get_asset_path("")
-        
+
         secho(f"Watching notes directory: {self.note_path}", fg="blue")
         secho(f"Watching scribe path: {self.scribe_path}", fg="blue")
 
     def handle_changes(self, changes):
         rebuild_needed = False
         changed_files = set()
-        
+
         for change_type, path in changes:
             path = Path(path)
             secho(f"\nChange detected: {change_type.name} - {path}", fg="blue")
-            
+
             # Skip temporary and backup files
             if path.name.endswith(".tmp") or ".scribe_backups" in str(path):
                 secho("Skipping temporary/backup file", fg="blue")
                 continue
-                
+
             # Handle website code changes
             if str(self.scribe_path) in str(path):
                 secho("Website code changed", fg="yellow")
@@ -49,12 +48,12 @@ class NotesBuilder:
                 # Clear all build state for website code changes
                 self.builder.build_state.clear()
                 continue
-                
+
             # Handle note changes
             try:
                 # Check if the file is under the notes directory
                 path.relative_to(self.note_path)
-                
+
                 if path.suffix == ".md":
                     if change_type in {Change.added, Change.modified}:
                         secho(f"Note changed: {path.relative_to(self.note_path)}", fg="yellow")
@@ -67,7 +66,7 @@ class NotesBuilder:
                     secho(f"Ignoring non-markdown file: {path.suffix}", fg="blue")
             except ValueError:
                 secho(f"Ignoring file outside notes directory: {path}", fg="blue")
-                
+
         if rebuild_needed:
             # Clear changed files from build state before rebuilding
             for file in changed_files:
@@ -77,7 +76,7 @@ class NotesBuilder:
     def build(self):
         environ["SCRIBE_ENVIRONMENT"] = self.env
         environ["MARKDOWN_PATH"] = str(self.note_path)
-        
+
         secho("\nRebuilding...", fg="yellow")
         self.builder.build(self.note_path, self.output_path)
         secho("Done.", fg="green")
@@ -91,7 +90,7 @@ class NotesBuilder:
 def main(notes: str, output: str, port: int, env: str):
     notes_path = Path(notes).expanduser().absolute()
     secho(f"Starting server with notes from: {notes_path}", fg="green")
-    
+
     # Launch the server
     runserver_process = Process(target=runserver, args=[output, port])
     runserver_process.start()
@@ -108,15 +107,17 @@ def main(notes: str, output: str, port: int, env: str):
     style_process.start()
 
     builder = NotesBuilder(notes, output, env)
-    
+
     # Initial build
     builder.build()
-    
+
     secho("\nWatching for changes... (Press Ctrl+C to stop)", fg="green")
-    
+
     try:
         # Watch for changes with a debounce of 50ms to avoid duplicate events
-        for changes in watch(notes_path, get_asset_path("templates"), watch_filter=None, debounce=50):
+        for changes in watch(
+            notes_path, get_asset_path("templates"), watch_filter=None, debounce=50
+        ):
             builder.handle_changes(changes)
     except KeyboardInterrupt:
         pass

@@ -42,13 +42,13 @@ def test_skip_hidden_directories(builder: WebsiteBuilder, note_directory: Path):
     # Create a hidden directory
     hidden_dir = note_directory / ".scribe_backups"
     hidden_dir.mkdir()
-    
+
     # Create a note in the hidden directory
     (hidden_dir / "hidden_note.md").write_text(DRAFT_NOTE)
-    
+
     # Create a note in the main directory
     (note_directory / "visible_note.md").write_text(DRAFT_NOTE)
-    
+
     notes = builder.get_notes(note_directory)
     assert len(notes) == 1
     assert notes[0].path.name == "visible_note.md"

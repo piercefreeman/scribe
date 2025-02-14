@@ -1,6 +1,6 @@
-from pathlib import Path
-import pytest
 from datetime import datetime
+
+import pytest
 
 from scribe.backup import backup_file
 
@@ -31,4 +31,4 @@ def test_prevent_recursive_backup(tmp_path):
     # Attempt to backup should raise ValueError
     with pytest.raises(ValueError) as exc:
         backup_file(test_file)
-    assert "Cannot backup a file that is already in a backup directory" in str(exc.value) 
+    assert "Cannot backup a file that is already in a backup directory" in str(exc.value)

@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum, unique
-from typing import Optional, Literal
 from pathlib import Path
+from typing import Optional
 
 from dateutil import parser as date_parser
 from pydantic import BaseModel, ConfigDict, validator
@@ -61,13 +61,14 @@ class CompileAsset(BaseModel):
        type: CompileAssetType
        output_path: str
     2. A simple path string that will be parsed to determine type and output path:
-       "src/components/MyComponent.tsx" -> 
+       "src/components/MyComponent.tsx" ->
        {
            path: "src/components/MyComponent.tsx",
            type: CompileAssetType.TSX,
            output_path: "src/components/MyComponent.js"
        }
     """
+
     path: str
     type: CompileAssetType
     output_path: str
@@ -79,7 +80,7 @@ class CompileAsset(BaseModel):
     def validate_type(cls, type_value):
         if isinstance(type_value, CompileAssetType):
             return type_value
-        
+
         try:
             return CompileAssetType(type_value)
         except ValueError:
@@ -109,16 +110,12 @@ class CompileAsset(BaseModel):
             asset_type = CompileAssetType.from_extension(path_obj.suffix)
         except ValueError as e:
             raise ValueError(f"Could not determine asset type for path {path}: {str(e)}")
-        
+
         # Replace the extension for the output path
         output_extension = cls._get_output_extension(asset_type)
         output_path = path_obj.with_suffix(output_extension)
-        
-        return cls(
-            path=str(path_obj),
-            type=asset_type,
-            output_path=str(output_path)
-        )
+
+        return cls(path=str(path_obj), type=asset_type, output_path=str(output_path))
 
     @classmethod
     def __get_validators__(cls):
@@ -182,7 +179,7 @@ class NoteMetadata(BaseModel):
     def validate_compile(cls, compile_assets):
         if not compile_assets:
             return []
-        
+
         # If we get a list of strings, convert each to a CompileAsset
         return [
             CompileAsset._from_path(asset) if isinstance(asset, str) else asset
