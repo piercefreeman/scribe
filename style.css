@@ -60,3 +60,11 @@
   @apply text-white;
 }
  */
+
+@layer components {
+  .large-image {
+    @apply shadow-lg border-white border-4 rounded-lg;
+    @apply lg:max-w-[100vw] lg:w-offset-content-image-lg xl:w-offset-content-image-xl;
+    @apply transform lg:-translate-x-[125px] xl:-translate-x-[200px];
+  }
+}

@@ -78,10 +78,10 @@
             gtag("config", "G-225CT0BPK1");
         </script>
     </head>
-    <body class="bg-white dark:bg-gray-900 antialiased text-sm">
-        <div class="grid grid-cols-12">
+    <body class="bg-white dark:bg-gray-900 antialiased text-sm px-4">
+        <div class="grid grid-cols-12 md:gap-18">
             <!-- Navigation -->
-            <div class="col-span-2 flex flex-col items-end">
+            <div class="col-span-12 md:col-span-2 flex flex-col items-center md:items-end">
                 <div class="mt-8 sticky top-4">
                     <div class="p-2 flex">
                         <a href="/">
@@ -119,7 +119,7 @@
                 </div>
             </div>
             <!-- Main Content -->
-            <div class="col-span-10 text-gray-900 dark:text-gray-100">
+            <div class="col-span-12 md:col-span-10 text-gray-900 dark:text-gray-100">
                 <div>{% include "dark_mode.html" %}</div>
                 <div class="pt-2 px-4 pb-6">
                     {% block content %}{% endblock %}

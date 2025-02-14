@@ -7,7 +7,7 @@
                 <div>
                     <div class="group">
                         <div class="pb-2 {% if loop.index == 0 %}pt-0{% endif %}">
-                            <div class="text-blue-500 dark:text-blue-300 hover:text-blue-400 font-bold flex items-center gap-x-2 underline">
+                            <div class="text-blue-500 dark:text-blue-300 hover:text-blue-400 font-bold md:flex items-center gap-x-2 underline">
                                 <p class="grow">
                                     <a href="{% if note.metadata.external_link %}{{ note.metadata.external_link }}{% else %}/notes/{{ note.webpage_path }}{% endif %}">
                                         {% if note.metadata.external_link %}
