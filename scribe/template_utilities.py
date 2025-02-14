@@ -2,6 +2,7 @@
 Utilities mounted and callable within Jinja.
 
 """
+
 from collections import defaultdict
 
 from scribe.note import Note
@@ -24,17 +25,9 @@ def filter_tag(
     tag_blacklist = {tag.lstrip("!") for tag in tag_values if tag.startswith("!")}
 
     if tag_whitelist:
-        notes = [
-            note
-            for note in notes
-            if len(set(note.metadata.tags) & set(tag_whitelist)) > 0
-        ]
+        notes = [note for note in notes if len(set(note.metadata.tags) & set(tag_whitelist)) > 0]
     if tag_blacklist:
-        notes = [
-            note
-            for note in notes
-            if len(set(note.metadata.tags) & set(tag_blacklist)) == 0
-        ]
+        notes = [note for note in notes if len(set(note.metadata.tags) & set(tag_blacklist)) == 0]
 
     if offset:
         notes = notes[offset:]

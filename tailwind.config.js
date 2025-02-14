@@ -28,17 +28,19 @@ module.exports = {
     "xl:-ml-[250px]",
     "lg:w-offset-content-image-lg",
     "xl:w-offset-content-image-xl",
+    "transform",
+    "lg:transform-center-offset-lg",
+    "xl:transform-center-offset-xl",
   ],
   darkMode: "class",
   theme: {
     extend: {
-      width: {
-        "offset-content-image-lg": "calc(100% + 250px)",
-        "offset-content-image-xl": "calc(100% + 400px)",
-      },
       typography: ({ theme }) => ({
         DEFAULT: {
           css: {
+            fontFamily: '"PT Serif", ui-serif, Cambria, "Times New Roman", Times, serif',
+            fontFeatureSettings: 'normal',
+            fontVariationSettings: 'normal',
             //'--tw-prose-body': theme('colors.gray[700]'),
             "--tw-prose-links": theme("colors.blue[500]"),
             "--tw-prose-invert-links": theme("colors.blue[300]"),

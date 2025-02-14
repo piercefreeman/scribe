@@ -1,3 +1,4 @@
+from datetime import datetime
 from logging import warning
 from os import environ
 from pathlib import Path
@@ -10,53 +11,18 @@ from markdown.extensions.fenced_code import FencedCodeExtension
 from markdown.extensions.footnotes import FootnoteExtension
 from markdown.extensions.tables import TableExtension
 
+from scribe.asset import Asset
+from scribe.backup import backup_file
 from scribe.metadata import FeaturedPhotoPayload, NoteMetadata
 from scribe.parsers import (
+    InvalidMetadataFormatException,
+    MissingMetadataBlockException,
+    NoTitleException,
     get_raw_text,
     get_simple_content,
     parse_metadata,
     parse_title,
 )
-
-
-class Asset:
-    """
-    Assets are tied to their parent note. This class normalizes assets
-    to be the full quality image. In other words we'll convert preview links
-    to their full filepath, following our assumed path patterns.
-
-    """
-
-    def __init__(self, note: "Note", path: Path):
-        self.root_path = note.webpage_path
-        self.path = Path(str(path).replace("-preview", "")).absolute()
-
-    @property
-    def name(self):
-        return Path(self.path).with_suffix("").name
-
-    @property
-    def preview_name(self):
-        return self.name + "-preview"
-
-    @property
-    def local_path(self):
-        return self.path
-
-    @property
-    def local_preview_path(self):
-        return self.path.parent / f"{self.preview_name}{self.path.suffix}"
-
-    @property
-    def remote_path(self):
-        return f"/images/{self.root_path}-{self.name}{self.path.suffix}"
-
-    @property
-    def remote_preview_path(self):
-        return f"/images/{self.root_path}-{self.preview_name}{self.path.suffix}"
-
-    def __hash__(self):
-        return hash(self.path)
 
 
 class Note:
@@ -97,10 +63,61 @@ class Note:
     def from_file(cls, path: Path):
         with open(path) as file:
             text = file.read().strip()
+
+        try:
             return cls.from_text(
                 path=path,
                 text=text,
             )
+        except NoTitleException:
+            # Backup the original file
+            backup_path = backup_file(path)
+            warning(f"Backed up original file to {backup_path}")
+
+            # Add a stub title with the current date
+            stub_header = f"# Draft Note {datetime.now().strftime('%Y-%m-%d')}\n\n"
+            new_text = stub_header + text
+
+            # Write the modified file
+            with open(path, "w") as f:
+                f.write(new_text)
+
+            warning(f"Added stub title to {path}")
+            return cls.from_text(
+                path=path,
+                text=new_text,
+            )
+        except MissingMetadataBlockException:
+            # Backup the original file
+            backup_path = backup_file(path)
+            warning(f"Backed up original file to {backup_path}")
+
+            # Add a stub metadata block after the title
+            lines = text.split("\n")
+            first_line = lines[
+                0
+            ]  # Title should be here since NoTitleException would have caught it
+            rest_of_file = "\n".join(lines[1:])
+
+            stub_metadata = f"""
+meta:
+    date: {datetime.now().strftime("%B %-d, %Y")}
+    status: draft
+"""
+            new_text = f"{first_line}\n{stub_metadata}\n{rest_of_file}"
+
+            # Write the modified file
+            with open(path, "w") as f:
+                f.write(new_text)
+
+            warning(f"Added stub metadata block to {path}")
+            return cls.from_text(
+                path=path,
+                text=new_text,
+            )
+        except InvalidMetadataFormatException as e:
+            # Re-raise with more context about which file failed
+            raise InvalidMetadataFormatException(f"Invalid metadata in {path}: {str(e)}")
 
     @classmethod
     def from_text(cls, path: Path | str, text: str):
@@ -209,17 +226,13 @@ class Note:
         # tag - so tailwind can pick up on them)
         for img in content.find_all("img"):
             image_classes = img.get("class", [])
-            image_classes.append(
-                "rounded-lg shadow-lg border-4 border-white dark:border-slate-600"
-            )
+            image_classes.append("rounded-lg shadow-lg border-4 border-white dark:border-slate-600")
 
             # Travel specific styling
-            # TODO: Generalize
             if "travel" in self.metadata.tags:
-                image_classes.append(
-                    "lg:max-w-[100vw] lg:-ml-[125px] lg:w-offset-content-image-lg"
-                )
-                image_classes.append("xl:-ml-[250px] xl:w-offset-content-image-xl")
+                image_classes.append("large-image")
+            else:
+                image_classes.append("small-image")
 
             img["class"] = " ".join(image_classes)
 

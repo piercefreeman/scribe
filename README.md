@@ -44,22 +44,46 @@ For full metadata schematic, see the `NoteMetadata` class.
 
 To install:
 
-```
-pip install -e .
+```bash
+uv sync
 npm install
 ```
 
 When writing, use the auto-refresh utility:
 
-```
+```bash
 start-writing --notes public [--port]
 ```
 
 If you'd like to build without the full CLI:
 
-```
+```bash
 build-notes --notes public
 ```
+
+## ZSH Shortcuts
+
+To make it easier to work with scribe, you can add the following to your `~/.zshrc`:
+
+```zsh
+# Scribe blog shortcut
+scribe() {
+    cd ~/projects/scribe && uv run start-writing --notes ~/notes/public "$@"
+}
+```
+
+After adding this, reload your shell configuration with `source ~/.zshrc`. Then you can simply type:
+
+```zsh
+scribe
+```
+
+This will:
+1. Navigate to your scribe directory
+2. Install/update dependencies using uv
+3. Start the writing server
+
+You can also pass additional arguments like `--port` directly: `scribe --port 8001`
 
 ## Styles
 

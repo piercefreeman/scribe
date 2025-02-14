@@ -5,13 +5,17 @@ from os import getenv
 from pathlib import Path
 from random import sample
 from shutil import copyfile
-from sys import maxsize
+from sys import exit, maxsize
+from typing import Set
 
 from click import secho
 from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
 from PIL.Image import Resampling
+from rich.console import Console
+from rich.tree import Tree
 
+from scribe.exceptions import HandledBuildError
 from scribe.io import get_asset_path
 from scribe.links import local_to_remote_links
 from scribe.metadata import BuildMetadata, FeaturedPhotoPosition, NoteStatus
@@ -19,6 +23,28 @@ from scribe.models import PageDefinition, PageDirection, TemplateArguments
 from scribe.note import Asset, Note
 from scribe.parsers import InvalidMetadataException
 from scribe.template_utilities import filter_tag, group_by_month
+
+console = Console()
+
+
+class BuildState:
+    """Tracks which files have been built in the current process"""
+
+    def __init__(self):
+        # Set of files that have been successfully built
+        self.built_files: Set[str] = set()
+
+    def needs_rebuild(self, file_path: Path) -> bool:
+        """Check if a file needs to be rebuilt"""
+        return str(file_path) not in self.built_files
+
+    def mark_built(self, file_path: Path):
+        """Mark a file as successfully built"""
+        self.built_files.add(str(file_path))
+
+    def clear(self):
+        """Clear all build state"""
+        self.built_files.clear()
 
 
 class WebsiteBuilder:
@@ -31,9 +57,11 @@ class WebsiteBuilder:
         self.env.globals["group_by_month"] = group_by_month
         self.env.globals["FeaturedPhotoPosition"] = FeaturedPhotoPosition
 
+        # Initialize build state
+        self.build_state = BuildState()
+
     def build(self, notes_path: str | Path, output_path: str | Path):
         notes_path = Path(notes_path).expanduser()
-
         output_path = Path(output_path).expanduser()
 
         output_path.mkdir(exist_ok=True)
@@ -48,9 +76,7 @@ class WebsiteBuilder:
             published_notes = all_notes
         else:
             published_notes = [
-                note
-                for note in all_notes
-                if note.metadata.status == NoteStatus.PUBLISHED
+                note for note in all_notes if note.metadata.status == NoteStatus.PUBLISHED
             ]
 
         build_metadata = BuildMetadata()
@@ -64,12 +90,8 @@ class WebsiteBuilder:
         self.build_notes(all_notes, output_path, build_metadata)
         self.build_pages(
             [
-                PageDefinition(
-                    "home.html", "index.html", TemplateArguments(notes=published_notes)
-                ),
-                PageDefinition(
-                    "rss.xml", "rss.xml", TemplateArguments(notes=published_notes)
-                ),
+                PageDefinition("home.html", "index.html", TemplateArguments(notes=published_notes)),
+                PageDefinition("rss.xml", "rss.xml", TemplateArguments(notes=published_notes)),
                 PageDefinition(
                     "travel.html",
                     "travel.html",
@@ -85,9 +107,7 @@ class WebsiteBuilder:
             build_metadata,
         )
 
-    def build_notes(
-        self, notes: list[Note], output_path: Path, build_metadata: BuildMetadata
-    ):
+    def build_notes(self, notes: list[Note], output_path: Path, build_metadata: BuildMetadata):
         # Upload the note assets
         for note in notes:
             for asset in note.assets:
@@ -99,9 +119,7 @@ class WebsiteBuilder:
             published_notes = notes
         else:
             published_notes = [
-                note
-                for note in notes
-                if note.metadata.status == NoteStatus.PUBLISHED
+                note for note in notes if note.metadata.status == NoteStatus.PUBLISHED
             ]
 
         # For each tag, sample related posts (up to 3 total)
@@ -112,10 +130,16 @@ class WebsiteBuilder:
 
         # Build the posts
         post_template_paths = ["post.html", "post-travel.html"]
-        post_templates = {
-            path: self.env.get_template(path) for path in post_template_paths
-        }
+        post_templates = {path: self.env.get_template(path) for path in post_template_paths}
         for note in notes:
+            output_file = output_path / "notes" / f"{note.webpage_path}.html"
+
+            # Skip if already built and source hasn't changed
+            if not self.build_state.needs_rebuild(note.path):
+                continue
+
+            secho(f"Building {note.title}", fg="yellow")
+
             possible_notes = list(
                 {
                     candidate_note
@@ -134,7 +158,7 @@ class WebsiteBuilder:
                 post_template_path = "post-travel.html"
             post_template = post_templates[post_template_path]
 
-            with open(output_path / "notes" / f"{note.webpage_path}.html", "w") as file:
+            with open(output_file, "w") as file:
                 file.write(
                     post_template.render(
                         header=note.title,
@@ -145,6 +169,9 @@ class WebsiteBuilder:
                         relevant_notes=relevant_notes,
                     )
                 )
+
+            # Mark as successfully built
+            self.build_state.mark_built(note.path)
 
     def build_pages(
         self,
@@ -161,9 +188,7 @@ class WebsiteBuilder:
             page_args = self.augment_page_directions(page_args)
 
             with open(output_path / page.url, "w") as file:
-                file.write(
-                    template.render(**asdict(page_args), build_metadata=build_metadata)
-                )
+                file.write(template.render(**asdict(page_args), build_metadata=build_metadata))
 
     def build_rss(self, notes, output_path):
         # Limit to just published notes
@@ -171,7 +196,7 @@ class WebsiteBuilder:
 
         # Build RSS feed
         rss_template = self.env.get_template("rss.xml")
-        with open(output_path / f"rss.xml", "w") as file:
+        with open(output_path / "rss.xml", "w") as file:
             file.write(
                 rss_template.render(
                     notes=notes,
@@ -193,13 +218,9 @@ class WebsiteBuilder:
         style_path = static_path / "style.css"
         code_path = static_path / "code.css"
         if style_path.exists():
-            build_metadata.style_hash = sha256(
-                style_path.read_text().encode()
-            ).hexdigest()
+            build_metadata.style_hash = sha256(style_path.read_text().encode()).hexdigest()
         if code_path.exists():
-            build_metadata.code_hash = sha256(
-                code_path.read_text().encode()
-            ).hexdigest()
+            build_metadata.code_hash = sha256(code_path.read_text().encode()).hexdigest()
 
     def get_paginated_arguments(self, notes: list[Note], limit: int):
         for offset in range(0, len(notes), limit):
@@ -210,6 +231,10 @@ class WebsiteBuilder:
             )
 
     def process_asset(self, asset: Asset, output_path: Path):
+        # Skip if already processed
+        if not self.build_state.needs_rebuild(asset.local_path):
+            return
+
         # Don't process preview files separately, process as part of their main asset package
         # Compress the assets if we don't already have a compressed version
         if not asset.local_preview_path.exists():
@@ -237,6 +262,9 @@ class WebsiteBuilder:
         if not remote_path.exists():
             copyfile(asset.local_path, remote_path)
 
+        # Mark as successfully processed
+        self.build_state.mark_built(asset.local_path)
+
     def augment_page_directions(self, arguments: TemplateArguments):
         """
         Use the metadata in a TemplateArgument to determine if there are additional
@@ -253,9 +281,7 @@ class WebsiteBuilder:
         has_previous = page_index > 0
 
         directions = []
-        directions += (
-            [PageDirection("previous", page_index - 1)] if has_previous else []
-        )
+        directions += [PageDirection("previous", page_index - 1)] if has_previous else []
         directions += [PageDirection("next", page_index + 1)] if has_next else []
 
         return replace(
@@ -265,28 +291,65 @@ class WebsiteBuilder:
 
     def get_notes(self, notes_path: Path):
         notes = []
-
         found_error = False
+
+        # Create a tree for visual display of notes
+        tree = Tree("Current Notes")
+        folders: dict[str, Tree] = {}
+
         for path in notes_path.rglob("*"):
+            # Skip hidden directories (those starting with .)
+            if any(part.startswith(".") for part in path.parts):
+                continue
+
             if path.suffix == ".md":
                 try:
                     note = Note.from_file(path)
                     if note.metadata.status in {NoteStatus.DRAFT, NoteStatus.PUBLISHED}:
                         notes.append(note)
+
+                        # Add to the tree visualization
+                        relative_path = path.relative_to(notes_path)
+                        parent_path = str(relative_path.parent)
+                        if parent_path == ".":
+                            tree.add(f"[blue]→[/blue] {note.title}")
+                        else:
+                            if parent_path not in folders:
+                                folders[parent_path] = tree.add(f"/{parent_path}")
+                            folders[parent_path].add(f"[blue]→[/blue] {note.title}")
+
                 except InvalidMetadataException as e:
-                    secho(f"Invalid metadata: {path}: {e}", fg="red")
+                    console.print(f"[red]Invalid metadata: {path}: {e}[/red]")
                     found_error = True
 
-        if found_error:
-            exit()
+        # Display the tree
+        console.print(tree)
 
+        if found_error:
+            exit(1)
+
+        # Notes are accessible by both their filename and title
         path_to_remote = {
-            note.filename: f"/notes/{note.webpage_path}" for note in notes
+            alias: f"/notes/{note.webpage_path}"
+            for note in notes
+            for alias in [note.filename, note.title]
         }
 
+        # Process each note's links, skipping those with broken links
+        processed_notes = []
         for note in notes:
-            note.text = local_to_remote_links(note, path_to_remote)
+            try:
+                note.text = local_to_remote_links(note, path_to_remote)
+                processed_notes.append(note)
+            except HandledBuildError:
+                console.print(f"[yellow]Skipping {note.title} due to broken links[/yellow]")
+                found_error = True
+                continue
 
-        notes = sorted(notes, key=lambda x: x.metadata.date, reverse=True)
+        if found_error:
+            console.print(
+                "[yellow]Some notes were skipped due to errors. Fix the issues and rebuild to include them.[/yellow]"
+            )
 
-        return notes
+        processed_notes = sorted(processed_notes, key=lambda x: x.metadata.date, reverse=True)
+        return processed_notes
