@@ -9,10 +9,18 @@
                     <div class="group">
                         <div class="relative overflow-hidden">
                             <a href="./notes/{{ note.webpage_path }}" class="block">
-                                <div class="py-6 px-4">
-                                    <div class="flex items-center justify-between">
-                                        <div class="text-2xl text-gray-800 dark:text-gray-200">{{ note.title }}</div>
-                                        <div class="text-gray-700 dark:text-gray-400 italic">{{ note.metadata.date.strftime("%B %Y") }}</div>
+                                <div class="pb-2 {% if loop.index == 0 %}pt-0{% endif %}">
+                                    <div class="text-blue-500 dark:text-blue-300 hover:text-blue-400 font-bold md:flex items-center gap-x-2 underline">
+                                        <p class="grow">
+                                            <span class="inline-block mr-1">§</span>
+                                            {{ note.title }}
+                                        </p>
+                                        {% if note.visible_tag %}
+                                            <div class="text-indigo-500 dark:text-indigo-300 font-bold text-sm">{{ note.visible_tag }}</div>
+                                        {% endif %}
+                                        <div class="text-indigo-500 dark:text-indigo-300 font-bold text-sm">
+                                            {{ note.metadata.date.strftime("%B %-d, %Y") }}
+                                        </div>
                                     </div>
                                 </div>
                                 {% if note.featured_assets %}
