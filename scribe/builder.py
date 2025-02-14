@@ -136,7 +136,6 @@ class WebsiteBuilder:
 
             # Skip if already built and source hasn't changed
             if not self.build_state.needs_rebuild(note.path):
-                secho(f"Skipping {note.title} - already built", fg="green")
                 continue
 
             secho(f"Building {note.title}", fg="yellow")
@@ -336,12 +335,21 @@ class WebsiteBuilder:
             for alias in [note.filename, note.title]
         }
 
-        try:
-            for note in notes:
+        # Process each note's links, skipping those with broken links
+        processed_notes = []
+        for note in notes:
+            try:
                 note.text = local_to_remote_links(note, path_to_remote)
-        except HandledBuildError:
-            exit(1)
+                processed_notes.append(note)
+            except HandledBuildError:
+                console.print(f"[yellow]Skipping {note.title} due to broken links[/yellow]")
+                found_error = True
+                continue
 
-        notes = sorted(notes, key=lambda x: x.metadata.date, reverse=True)
+        if found_error:
+            console.print(
+                "[yellow]Some notes were skipped due to errors. Fix the issues and rebuild to include them.[/yellow]"
+            )
 
-        return notes
+        processed_notes = sorted(processed_notes, key=lambda x: x.metadata.date, reverse=True)
+        return processed_notes

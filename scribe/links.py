@@ -80,6 +80,8 @@ def local_to_remote_links(
             error_text.append(note.filename, style="yellow")
             error_text.append("\nCannot find: ", style="red")
             error_text.append(match.group(0), style="yellow")
+            error_text.append("\nFull path: ", style="red")
+            error_text.append(str(note.path), style="yellow")
             console.print(error_text)
 
             if similar_files:
@@ -97,8 +99,12 @@ def local_to_remote_links(
                     border_style="blue",
                 )
                 console.print(suggestions)
+            else:
+                console.print(
+                    "[yellow]No similar files found. Make sure the linked file exists and is properly named.[/yellow]"
+                )
 
-            raise HandledBuildError()
+            raise HandledBuildError(f"Broken link in {note.filename}: {match.group(0)}")
 
         remote_path = path_to_remote[filename]
         to_replace.append((text, local_link, remote_path))
