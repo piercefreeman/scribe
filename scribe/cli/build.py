@@ -38,7 +38,12 @@ def main(notes: str, output: str, clean: bool, env: str):
 
     # Build the styles
     command = f"cd {get_asset_path('../')} && npm run styles-build"
-    subprocess.run(command, shell=True)
+    response = subprocess.run(command, shell=True)
+
+    # Ensure the styles build was successful
+    if response.returncode != 0:
+        secho("Styles build failed", fg="red")
+        exit(1)
 
     builder = WebsiteBuilder()
     if clean:

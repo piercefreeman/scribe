@@ -32,10 +32,3 @@ def runserver(directory, port):
         return FileResponse(path)
 
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
-@command()
-@option("--directory", default="static")
-@option("--port", type=int, default=5000)
-def main(directory, port):
-    runserver(directory, port)
