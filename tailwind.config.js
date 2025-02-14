@@ -39,6 +39,9 @@ module.exports = {
       typography: ({ theme }) => ({
         DEFAULT: {
           css: {
+            fontFamily: '"PT Serif", ui-serif, Cambria, "Times New Roman", Times, serif',
+            fontFeatureSettings: 'normal',
+            fontVariationSettings: 'normal',
             //'--tw-prose-body': theme('colors.gray[700]'),
             "--tw-prose-links": theme("colors.blue[500]"),
             "--tw-prose-invert-links": theme("colors.blue[300]"),
