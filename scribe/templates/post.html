@@ -12,7 +12,7 @@
                     <div class="mt-4 text-gray-300">
                         <h6># {{ metadata.date.strftime("%B %-d, %Y") }}</h6>
                     </div>
-                    <div class="text-sm leading-5 prose prose-img:m-0 dark:prose-invert mt-4 max-w-none">{{ content|safe }}</div>
+                    <div class="text-sm leading-5 prose md:prose-base prose-lg prose-img:m-0 dark:prose-invert mt-4 max-w-none">{{ content|safe }}</div>
                     {% if metadata.tags %}
                         <div class="text-sm leading-5 prose prose-img:m-0 dark:prose-invert mt-4 max-w-none">
                             Related tags:
