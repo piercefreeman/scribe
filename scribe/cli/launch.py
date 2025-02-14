@@ -31,6 +31,7 @@ class NotesBuilder:
 
     def handle_changes(self, changes):
         rebuild_needed = False
+        changed_files = set()
         
         for change_type, path in changes:
             path = Path(path)
@@ -45,6 +46,8 @@ class NotesBuilder:
             if str(self.scribe_path) in str(path):
                 secho("Website code changed", fg="yellow")
                 rebuild_needed = True
+                # Clear all build state for website code changes
+                self.builder.build_state.clear()
                 continue
                 
             # Handle note changes
@@ -56,6 +59,8 @@ class NotesBuilder:
                     if change_type in {Change.added, Change.modified}:
                         secho(f"Note changed: {path.relative_to(self.note_path)}", fg="yellow")
                         rebuild_needed = True
+                        # Track which files need to be rebuilt
+                        changed_files.add(path)
                     else:
                         secho(f"Ignoring change type: {change_type.name}", fg="blue")
                 else:
@@ -64,6 +69,9 @@ class NotesBuilder:
                 secho(f"Ignoring file outside notes directory: {path}", fg="blue")
                 
         if rebuild_needed:
+            # Clear changed files from build state before rebuilding
+            for file in changed_files:
+                self.builder.build_state.built_files.discard(str(file))
             self.build()
 
     def build(self):
@@ -106,15 +114,9 @@ def main(notes: str, output: str, port: int, env: str):
     
     secho("\nWatching for changes... (Press Ctrl+C to stop)", fg="green")
     
-    # Watch both the notes directory and templates
-    watch_paths = [
-        str(notes_path),
-        str(get_asset_path("templates")),
-    ]
-    
     try:
         # Watch for changes with a debounce of 50ms to avoid duplicate events
-        for changes in watch(watch_paths, watch_filter=None, debounce=50):
+        for changes in watch(notes_path, get_asset_path("templates"), watch_filter=None, debounce=50):
             builder.handle_changes(changes)
     except KeyboardInterrupt:
         pass
