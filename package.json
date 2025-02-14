@@ -6,11 +6,12 @@
   "dependencies": {
     "@tailwindcss/forms": "^0.5.3",
     "@tailwindcss/typography": "^0.5.0",
-    "tailwindcss": "^3.0.8"
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/cli": "^4.0.0"
   },
   "scripts": {
-    "styles-build": "npx tailwindcss -o scribe/resources/style.css",
-    "styles-watch": "npx tailwindcss -o scribe/resources/style.css --watch",
+    "styles-build": "npx @tailwindcss/cli -i ./style.css -o scribe/resources/style.css",
+    "styles-watch": "npx @tailwindcss/cli -i ./style.css -o scribe/resources/style.css --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
