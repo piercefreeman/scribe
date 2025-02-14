@@ -100,28 +100,34 @@ class CompileAsset(BaseModel):
             raise ValueError(f"Unknown asset type: {type}")
 
     @classmethod
+    def _from_path(cls, path: str) -> "CompileAsset":
+        """
+        Create a CompileAsset from a path string
+        """
+        path_obj = Path(path)
+        try:
+            asset_type = CompileAssetType.from_extension(path_obj.suffix)
+        except ValueError as e:
+            raise ValueError(f"Could not determine asset type for path {path}: {str(e)}")
+        
+        # Replace the extension for the output path
+        output_extension = cls._get_output_extension(asset_type)
+        output_path = path_obj.with_suffix(output_extension)
+        
+        return cls(
+            path=str(path_obj),
+            type=asset_type,
+            output_path=str(output_path)
+        )
+
+    @classmethod
     def __get_validators__(cls):
         yield cls.validate
 
     @classmethod
     def validate(cls, v):
         if isinstance(v, str):
-            # Handle simple path format
-            path = Path(v)
-            try:
-                asset_type = CompileAssetType.from_extension(path.suffix)
-            except ValueError as e:
-                raise ValueError(f"Could not determine asset type for path {v}: {str(e)}")
-            
-            # Replace the extension for the output path
-            output_extension = cls._get_output_extension(asset_type)
-            output_path = path.with_suffix(output_extension)
-            
-            return cls(
-                path=str(path),
-                type=asset_type,
-                output_path=str(output_path)
-            )
+            return cls._from_path(v)
         elif isinstance(v, dict):
             return cls(**v)
         elif isinstance(v, cls):
@@ -171,6 +177,17 @@ class NoteMetadata(BaseModel):
             return NoteStatus.PUBLISHED
         else:
             raise ValueError(f"Unknown status: `{status}`")
+
+    @validator("compile", pre=True)
+    def validate_compile(cls, compile_assets):
+        if not compile_assets:
+            return []
+        
+        # If we get a list of strings, convert each to a CompileAsset
+        return [
+            CompileAsset._from_path(asset) if isinstance(asset, str) else asset
+            for asset in compile_assets
+        ]
 
     class Config:
         extra = "forbid"

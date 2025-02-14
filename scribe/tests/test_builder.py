@@ -35,6 +35,25 @@ def test_exclude_scratch(builder: WebsiteBuilder, note_directory: Path):
     assert notes[0].metadata.status == NoteStatus.DRAFT
 
 
+def test_skip_hidden_directories(builder: WebsiteBuilder, note_directory: Path):
+    """
+    Test that files in hidden directories (starting with .) are skipped
+    """
+    # Create a hidden directory
+    hidden_dir = note_directory / ".scribe_backups"
+    hidden_dir.mkdir()
+    
+    # Create a note in the hidden directory
+    (hidden_dir / "hidden_note.md").write_text(DRAFT_NOTE)
+    
+    # Create a note in the main directory
+    (note_directory / "visible_note.md").write_text(DRAFT_NOTE)
+    
+    notes = builder.get_notes(note_directory)
+    assert len(notes) == 1
+    assert notes[0].path.name == "visible_note.md"
+
+
 def test_get_notes_empty_directory(builder: WebsiteBuilder, note_directory: Path):
     result = builder.get_notes(note_directory)
     assert result == []

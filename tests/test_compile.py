@@ -192,4 +192,50 @@ def test_compile_handler_with_custom_strategies():
     )
     
     assert result.success
-    mock_strategy.compile.assert_called_once() 
+    mock_strategy.compile.assert_called_once()
+
+
+def test_compile_asset_from_string():
+    # Test TSX
+    asset = CompileAsset._from_path("src/component.tsx")
+    assert asset.path == "src/component.tsx"
+    assert asset.type == CompileAssetType.TSX
+    assert asset.output_path == "src/component.js"
+    
+    # Test CSS
+    asset = CompileAsset._from_path("styles/main.css")
+    assert asset.path == "styles/main.css"
+    assert asset.type == CompileAssetType.CSS
+    assert asset.output_path == "styles/main.css"
+    
+    # Test HTML
+    asset = CompileAsset._from_path("index.html")
+    assert asset.path == "index.html"
+    assert asset.type == CompileAssetType.HTML
+    assert asset.output_path == "index.html"
+
+
+def test_compile_asset_from_string_invalid():
+    with pytest.raises(ValueError) as exc:
+        CompileAsset._from_path("invalid.xyz")
+    assert "Could not determine asset type" in str(exc.value)
+
+
+def test_note_metadata_compile_list():
+    from scribe.metadata import NoteMetadata
+    from datetime import datetime
+    
+    metadata = NoteMetadata(
+        date=datetime.now(),
+        compile=[
+            "demo/main.tsx",
+            "demo/styles.css",
+            "demo/index.html"
+        ]
+    )
+    
+    assert len(metadata.compile) == 3
+    assert isinstance(metadata.compile[0], CompileAsset)
+    assert metadata.compile[0].path == "demo/main.tsx"
+    assert metadata.compile[0].type == CompileAssetType.TSX
+    assert metadata.compile[0].output_path == "demo/main.js" 

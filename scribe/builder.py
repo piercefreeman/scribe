@@ -248,6 +248,10 @@ class WebsiteBuilder:
 
         found_error = False
         for path in notes_path.rglob("*"):
+            # Skip hidden directories (those starting with .)
+            if any(part.startswith(".") for part in path.parts):
+                continue
+                
             if path.suffix == ".md":
                 try:
                     note = Note.from_file(path)

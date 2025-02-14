@@ -12,8 +12,23 @@ from scribe.metadata import NoteMetadata
 
 
 class InvalidMetadataException(Exception):
-    def __init__(self, message):
-        self.message = message
+    """Base exception for metadata validation failures."""
+    pass
+
+
+class NoTitleException(InvalidMetadataException):
+    """Raised when a note has no title (# header) specified."""
+    pass
+
+
+class MissingMetadataBlockException(InvalidMetadataException):
+    """Raised when a note is missing the metadata block entirely."""
+    pass
+
+
+class InvalidMetadataFormatException(InvalidMetadataException):
+    """Raised when metadata format/content is invalid."""
+    pass
 
 
 @dataclass
@@ -46,7 +61,7 @@ def parse_title(text: str) -> ParsedText:
     headers = findall(r"(#+)(.*)", first_line)
     headers = sorted(headers, key=lambda x: len(x[0]))
     if not headers:
-        raise InvalidMetadataException("No header specified.")
+        raise NoTitleException("No title (# header) specified.")
     return ParsedText(result=headers[0][1].strip(), parsed_lines=[0])
 
 
@@ -66,13 +81,13 @@ def parse_metadata(text: str) -> ParsedMetadata:
             parsed_lines.append(i)
 
     if not metadata_string:
-        # If users haven't specified metadata, assume it is a scratch note
-        return ParsedMetadata(result=NoteMetadata(date=datetime.now()), parsed_lines=[])
+        # If users haven't specified metadata block at all, this is an error
+        raise MissingMetadataBlockException("No metadata block ('meta:') found in the file.")
 
     try:
         metadata = NoteMetadata.parse_obj(yaml_loads(metadata_string)["meta"])
     except ValidationError as e:
-        raise InvalidMetadataException(str(e))
+        raise InvalidMetadataFormatException(str(e))
 
     return ParsedMetadata(result=metadata, parsed_lines=parsed_lines)
 

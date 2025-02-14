@@ -132,3 +132,6 @@ node_modules
 
 **/resources/style.css
 static
+
+# Scribe backups
+**/.scribe_backups/

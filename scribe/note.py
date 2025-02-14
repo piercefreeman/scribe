@@ -2,6 +2,7 @@ from logging import warning
 from os import environ
 from pathlib import Path
 from re import sub
+from datetime import datetime
 
 from bs4 import BeautifulSoup
 from markdown import markdown
@@ -12,11 +13,16 @@ from markdown.extensions.tables import TableExtension
 
 from scribe.asset import Asset
 from scribe.metadata import FeaturedPhotoPayload, NoteMetadata
+from scribe.backup import backup_file
 from scribe.parsers import (
     get_raw_text,
     get_simple_content,
     parse_metadata,
     parse_title,
+    InvalidMetadataException,
+    NoTitleException,
+    MissingMetadataBlockException,
+    InvalidMetadataFormatException,
 )
 
 
@@ -58,10 +64,59 @@ class Note:
     def from_file(cls, path: Path):
         with open(path) as file:
             text = file.read().strip()
+
+        try:
             return cls.from_text(
                 path=path,
                 text=text,
             )
+        except NoTitleException:
+            # Backup the original file
+            backup_path = backup_file(path)
+            warning(f"Backed up original file to {backup_path}")
+
+            # Add a stub title with the current date
+            stub_header = f"# Draft Note {datetime.now().strftime('%Y-%m-%d')}\n\n"
+            new_text = stub_header + text
+
+            # Write the modified file
+            with open(path, "w") as f:
+                f.write(new_text)
+
+            warning(f"Added stub title to {path}")
+            return cls.from_text(
+                path=path,
+                text=new_text,
+            )
+        except MissingMetadataBlockException:
+            # Backup the original file
+            backup_path = backup_file(path)
+            warning(f"Backed up original file to {backup_path}")
+
+            # Add a stub metadata block after the title
+            lines = text.split("\n")
+            first_line = lines[0]  # Title should be here since NoTitleException would have caught it
+            rest_of_file = "\n".join(lines[1:])
+            
+            stub_metadata = f"""
+meta:
+    date: {datetime.now().strftime('%B %-d, %Y')}
+    status: draft
+"""
+            new_text = f"{first_line}\n{stub_metadata}\n{rest_of_file}"
+
+            # Write the modified file
+            with open(path, "w") as f:
+                f.write(new_text)
+
+            warning(f"Added stub metadata block to {path}")
+            return cls.from_text(
+                path=path,
+                text=new_text,
+            )
+        except InvalidMetadataFormatException as e:
+            # Re-raise with more context about which file failed
+            raise InvalidMetadataFormatException(f"Invalid metadata in {path}: {str(e)}")
 
     @classmethod
     def from_text(cls, path: Path | str, text: str):
