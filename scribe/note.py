@@ -230,6 +230,8 @@ meta:
             # Travel specific styling
             if "travel" in self.metadata.tags:
                 image_classes.append("large-image")
+            else:
+                image_classes.append("small-image")
 
             img["class"] = " ".join(image_classes)
 
