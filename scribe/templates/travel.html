@@ -25,7 +25,7 @@
                                 </div>
                                 {% if note.featured_assets %}
                                     <img src="{{ note.featured_assets[0].asset.remote_preview_path }}"
-                                         class="object-cover rounded-sm aspect-video w-full {% if note.featured_assets[0].cover == FeaturedPhotoPosition.CENTER %} object-center {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.LEFT %} object-left {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.RIGHT %} object-right {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.TOP %} object-top {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.BOTTOM %} object-bottom {% endif %}" />
+                                         class="object-cover rounded-sm aspect-square md:aspect-video w-full {% if note.featured_assets[0].cover == FeaturedPhotoPosition.CENTER %} object-center {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.LEFT %} object-left {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.RIGHT %} object-right {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.TOP %} object-top {% elif note.featured_assets[0].cover == FeaturedPhotoPosition.BOTTOM %} object-bottom {% endif %}" />
                                 {% endif %}
                             </a>
                         </div>

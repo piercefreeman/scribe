@@ -83,11 +83,15 @@ class WebsiteBuilder:
 
         # The static build phase will inject the stylesheet hashes that will be used
         # for cache invalidation in subsequent pages
+        console.print("[blue]Building static assets[/blue]")
         self.build_static(output_path, build_metadata)
 
         # Build all notes that are either in draft form or published. Draft notes require a unique
         # URL to access them but should be displayed publically
+        console.print("[blue]Building notes[/blue]")
         self.build_notes(all_notes, output_path, build_metadata)
+
+        console.print("[blue]Building pages[/blue]")
         self.build_pages(
             [
                 PageDefinition("home.html", "index.html", TemplateArguments(notes=published_notes)),
@@ -108,11 +112,6 @@ class WebsiteBuilder:
         )
 
     def build_notes(self, notes: list[Note], output_path: Path, build_metadata: BuildMetadata):
-        # Upload the note assets
-        for note in notes:
-            for asset in note.assets:
-                self.process_asset(asset, output_path=output_path)
-
         # When developing locally it's nice to preview draft notes on the homepage as they will look live
         # But require this as an explicit env variable
         if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
@@ -138,7 +137,11 @@ class WebsiteBuilder:
             if not self.build_state.needs_rebuild(note.path):
                 continue
 
-            secho(f"Building {note.title}", fg="yellow")
+            # Format the images / media associated with this note
+            for asset in note.assets:
+                self.process_asset(asset, output_path=output_path)
+
+            console.print(f"[yellow]Building {note.title}[/yellow]")
 
             possible_notes = list(
                 {
