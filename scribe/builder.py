@@ -7,6 +7,9 @@ from random import sample
 from shutil import copyfile
 from sys import exit
 from sys import maxsize
+import json
+from datetime import datetime
+from typing import Dict, Optional, Set
 
 from rich.console import Console
 from rich.tree import Tree
@@ -28,6 +31,26 @@ from scribe.template_utilities import filter_tag, group_by_month
 console = Console()
 
 
+class BuildState:
+    """Tracks which files have been built in the current process"""
+    
+    def __init__(self):
+        # Set of files that have been successfully built
+        self.built_files: Set[str] = set()
+        
+    def needs_rebuild(self, file_path: Path) -> bool:
+        """Check if a file needs to be rebuilt"""
+        return str(file_path) not in self.built_files
+        
+    def mark_built(self, file_path: Path):
+        """Mark a file as successfully built"""
+        self.built_files.add(str(file_path))
+        
+    def clear(self):
+        """Clear all build state"""
+        self.built_files.clear()
+
+
 class WebsiteBuilder:
     def __init__(self):
         self.env = Environment(
@@ -37,18 +60,20 @@ class WebsiteBuilder:
         self.env.globals["filter_tag"] = filter_tag
         self.env.globals["group_by_month"] = group_by_month
         self.env.globals["FeaturedPhotoPosition"] = FeaturedPhotoPosition
+        
+        # Initialize build state
+        self.build_state = BuildState()
 
     def build(self, notes_path: str | Path, output_path: str | Path):
         notes_path = Path(notes_path).expanduser()
-
         output_path = Path(output_path).expanduser()
-
+        
         output_path.mkdir(exist_ok=True)
         (output_path / "notes").mkdir(exist_ok=True)
         (output_path / "images").mkdir(exist_ok=True)
 
         all_notes = self.get_notes(notes_path)
-
+        
         # When developing locally it's nice to preview draft notes on the homepage as they will look live
         # But require this as an explicit env variable
         if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
@@ -111,6 +136,15 @@ class WebsiteBuilder:
         post_template_paths = ["post.html", "post-travel.html"]
         post_templates = {path: self.env.get_template(path) for path in post_template_paths}
         for note in notes:
+            output_file = output_path / "notes" / f"{note.webpage_path}.html"
+            
+            # Skip if already built and source hasn't changed
+            if not self.build_state.needs_rebuild(note.path):
+                secho(f"Skipping {note.title} - already built", fg="green")
+                continue
+                
+            secho(f"Building {note.title}", fg="yellow")
+            
             possible_notes = list(
                 {
                     candidate_note
@@ -129,7 +163,7 @@ class WebsiteBuilder:
                 post_template_path = "post-travel.html"
             post_template = post_templates[post_template_path]
 
-            with open(output_path / "notes" / f"{note.webpage_path}.html", "w") as file:
+            with open(output_file, "w") as file:
                 file.write(
                     post_template.render(
                         header=note.title,
@@ -140,6 +174,9 @@ class WebsiteBuilder:
                         relevant_notes=relevant_notes,
                     )
                 )
+            
+            # Mark as successfully built
+            self.build_state.mark_built(note.path)
 
     def build_pages(
         self,
@@ -199,6 +236,10 @@ class WebsiteBuilder:
             )
 
     def process_asset(self, asset: Asset, output_path: Path):
+        # Skip if already processed
+        if not self.build_state.needs_rebuild(asset.local_path):
+            return
+            
         # Don't process preview files separately, process as part of their main asset package
         # Compress the assets if we don't already have a compressed version
         if not asset.local_preview_path.exists():
@@ -225,6 +266,9 @@ class WebsiteBuilder:
         remote_path = output_path / f"./{asset.remote_path}"
         if not remote_path.exists():
             copyfile(asset.local_path, remote_path)
+            
+        # Mark as successfully processed
+        self.build_state.mark_built(asset.local_path)
 
     def augment_page_directions(self, arguments: TemplateArguments):
         """
@@ -289,7 +333,12 @@ class WebsiteBuilder:
         if found_error:
             exit(1)
 
-        path_to_remote = {note.filename: f"/notes/{note.webpage_path}" for note in notes}
+        # Notes are accessible by both their filename and title
+        path_to_remote = {
+            alias: f"/notes/{note.webpage_path}"
+            for note in notes
+            for alias in [note.filename, note.title]
+        }
 
         try:
             for note in notes:

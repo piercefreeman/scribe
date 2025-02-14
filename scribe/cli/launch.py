@@ -11,45 +11,68 @@ from click import (
     option,
     secho,
 )
-from watchdog.events import FileSystemEventHandler
-from watchdog.observers import Observer
+from watchfiles import watch, Change
 
 from scribe.cli.runserver import runserver
 from scribe.io import get_asset_path
+from scribe.builder import WebsiteBuilder
 
 
-class NotesChangedEventHandler(FileSystemEventHandler):
-    def __init__(self, note_path, output_path, env):
-        self.scribe_path = get_asset_path("")
-        self.note_path = note_path
+class NotesBuilder:
+    def __init__(self, note_path: str, output_path: str, env: str):
+        self.note_path = Path(note_path).expanduser().absolute()
         self.output_path = output_path
         self.env = env
+        self.builder = WebsiteBuilder()
+        self.scribe_path = get_asset_path("")
+        
+        secho(f"Watching notes directory: {self.note_path}", fg="blue")
+        secho(f"Watching scribe path: {self.scribe_path}", fg="blue")
 
-        self.builder_process = None
+    def handle_changes(self, changes):
+        rebuild_needed = False
+        
+        for change_type, path in changes:
+            path = Path(path)
+            secho(f"\nChange detected: {change_type.name} - {path}", fg="blue")
+            
+            # Skip temporary and backup files
+            if path.name.endswith(".tmp") or ".scribe_backups" in str(path):
+                secho("Skipping temporary/backup file", fg="blue")
+                continue
+                
+            # Handle website code changes
+            if str(self.scribe_path) in str(path):
+                secho("Website code changed", fg="yellow")
+                rebuild_needed = True
+                continue
+                
+            # Handle note changes
+            try:
+                # Check if the file is under the notes directory
+                path.relative_to(self.note_path)
+                
+                if path.suffix == ".md":
+                    if change_type in {Change.added, Change.modified}:
+                        secho(f"Note changed: {path.relative_to(self.note_path)}", fg="yellow")
+                        rebuild_needed = True
+                    else:
+                        secho(f"Ignoring change type: {change_type.name}", fg="blue")
+                else:
+                    secho(f"Ignoring non-markdown file: {path.suffix}", fg="blue")
+            except ValueError:
+                secho(f"Ignoring file outside notes directory: {path}", fg="blue")
+                
+        if rebuild_needed:
+            self.build()
 
-    def on_any_event(self, event):
-        # TODO: Why is this running twice
-        if str(self.scribe_path) in event.src_path:
-            secho("website code changed", fg="yellow")
-        elif str(self.note_path) in event.src_path and "static" not in event.src_path:
-            secho(f"note changed: `{event.src_path}`", fg="yellow")
-        else:
-            return
-
-        self.build_notes()
-
-    def build_notes(self):
-        # Cancel any outdated build requests
-        if self.builder_process:
-            self.builder_process.terminate()
-
-        self.builder_process = Process(
-            target=system,
-            args=[
-                f"build-notes --notes {self.note_path} --output {self.output_path} --env {self.env}"
-            ],
-        )
-        self.builder_process.start()
+    def build(self):
+        environ["SCRIBE_ENVIRONMENT"] = self.env
+        environ["MARKDOWN_PATH"] = str(self.note_path)
+        
+        secho("\nRebuilding...", fg="yellow")
+        self.builder.build(self.note_path, self.output_path)
+        secho("Done.", fg="green")
 
 
 @command()
@@ -58,36 +81,43 @@ class NotesChangedEventHandler(FileSystemEventHandler):
 @option("--port", default=3100)
 @option("--env", default="DEVELOPMENT")
 def main(notes: str, output: str, port: int, env: str):
+    notes_path = Path(notes).expanduser().absolute()
+    secho(f"Starting server with notes from: {notes_path}", fg="green")
+    
     # Launch the server
     runserver_process = Process(target=runserver, args=[output, port])
     runserver_process.start()
 
-    environ["MARKDOWN_PATH"] = str(Path(notes).expanduser().absolute())
+    environ["MARKDOWN_PATH"] = str(notes_path)
 
     # Launch the styling refresh system
     scribe_root = get_asset_path("../").resolve().absolute()
-    secho("Using scribe root: " + str(scribe_root), fg="yellow")
+    secho(f"Using scribe root: {scribe_root}", fg="blue")
     style_process = Process(
         target=system,
         args=[f"cd {scribe_root} && npm run styles-watch"],
     )
     style_process.start()
 
-    event_handler = NotesChangedEventHandler(notes, output, env)
-
-    # Initial run to generate right when the CLI command is run
-    event_handler.build_notes()
-
-    observer = Observer()
-    observer.schedule(event_handler, ".", recursive=True)
-    observer.schedule(event_handler, get_asset_path("templates"), recursive=True)
-    observer.start()
+    builder = NotesBuilder(notes, output, env)
+    
+    # Initial build
+    builder.build()
+    
+    secho("\nWatching for changes... (Press Ctrl+C to stop)", fg="green")
+    
+    # Watch both the notes directory and templates
+    watch_paths = [
+        str(notes_path),
+        str(get_asset_path("templates")),
+    ]
+    
     try:
-        while True:
-            sleep(1)
+        # Watch for changes with a debounce of 50ms to avoid duplicate events
+        for changes in watch(watch_paths, watch_filter=None, debounce=50):
+            builder.handle_changes(changes)
     except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+        pass
 
     runserver_process.join()
     style_process.join()

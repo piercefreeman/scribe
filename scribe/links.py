@@ -61,7 +61,7 @@ def local_to_remote_links(
     # [(text, local link, remote link)]
     to_replace = []
 
-    # Swap the local links
+    # Swap the local links with their actual remote counterparts
     for match in local_links:
         text = match.group(1)
         local_link = match.group(2)

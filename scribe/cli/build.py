@@ -40,6 +40,7 @@ def main(notes: str, output: str, clean: bool, env: str):
     command = f"cd {get_asset_path('../')} && npm run styles-build"
     subprocess.run(command, shell=True)
 
+    builder = WebsiteBuilder()
     if clean:
         if Path(output).exists():
             secho("Removing all previous output...", fg="yellow")
@@ -48,6 +49,8 @@ def main(notes: str, output: str, clean: bool, env: str):
             # again. This results in a broken state & crash where we have a mostly empty static
             # directory and the webserver is unable to render the page.
             rmtree(output, ignore_errors=True)
+            # Clear build state to force rebuild of everything
+            builder.build_state.clear()
     else:
         # Just delete the html files, keep the media
         if Path(output).exists():
@@ -55,4 +58,4 @@ def main(notes: str, output: str, clean: bool, env: str):
             for item in Path(output).glob("**/*.html"):
                 unlink(item)
 
-    build(notes, output)
+    builder.build(notes, output)
