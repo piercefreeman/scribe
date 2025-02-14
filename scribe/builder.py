@@ -5,8 +5,11 @@ from os import getenv
 from pathlib import Path
 from random import sample
 from shutil import copyfile
+from sys import exit
 from sys import maxsize
 
+from rich.console import Console
+from rich.tree import Tree
 from click import secho
 from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
@@ -18,7 +21,11 @@ from scribe.metadata import BuildMetadata, FeaturedPhotoPosition, NoteStatus
 from scribe.models import PageDefinition, PageDirection, TemplateArguments
 from scribe.note import Asset, Note
 from scribe.parsers import InvalidMetadataException
+from scribe.exceptions import HandledBuildError
 from scribe.template_utilities import filter_tag, group_by_month
+
+
+console = Console()
 
 
 class WebsiteBuilder:
@@ -245,8 +252,12 @@ class WebsiteBuilder:
 
     def get_notes(self, notes_path: Path):
         notes = []
-
         found_error = False
+
+        # Create a tree for visual display of notes
+        tree = Tree("Current Notes")
+        folders: dict[str, Tree] = {}
+
         for path in notes_path.rglob("*"):
             # Skip hidden directories (those starting with .)
             if any(part.startswith(".") for part in path.parts):
@@ -257,17 +268,34 @@ class WebsiteBuilder:
                     note = Note.from_file(path)
                     if note.metadata.status in {NoteStatus.DRAFT, NoteStatus.PUBLISHED}:
                         notes.append(note)
+                        
+                        # Add to the tree visualization
+                        relative_path = path.relative_to(notes_path)
+                        parent_path = str(relative_path.parent)
+                        if parent_path == ".":
+                            tree.add(f"[blue]→[/blue] {note.title}")
+                        else:
+                            if parent_path not in folders:
+                                folders[parent_path] = tree.add(f"/{parent_path}")
+                            folders[parent_path].add(f"[blue]→[/blue] {note.title}")
+
                 except InvalidMetadataException as e:
-                    secho(f"Invalid metadata: {path}: {e}", fg="red")
+                    console.print(f"[red]Invalid metadata: {path}: {e}[/red]")
                     found_error = True
 
+        # Display the tree
+        console.print(tree)
+
         if found_error:
-            exit()
+            exit(1)
 
         path_to_remote = {note.filename: f"/notes/{note.webpage_path}" for note in notes}
 
-        for note in notes:
-            note.text = local_to_remote_links(note, path_to_remote)
+        try:
+            for note in notes:
+                note.text = local_to_remote_links(note, path_to_remote)
+        except HandledBuildError:
+            exit(1)
 
         notes = sorted(notes, key=lambda x: x.metadata.date, reverse=True)
 

@@ -3,9 +3,16 @@ from pathlib import Path
 from re import escape as re_escape
 from re import finditer, sub
 
-from click import secho
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.text import Text
+from rapidfuzz import process
 
+from scribe.exceptions import HandledBuildError
 from scribe.note import Note
+
+console = Console()
 
 
 def local_to_remote_links(
@@ -61,12 +68,34 @@ def local_to_remote_links(
 
         filename = Path(local_link).with_suffix("").name
         if filename not in path_to_remote:
-            secho("Available paths:")
-            for filename, path in path_to_remote.items():
-                secho(f"{path}: `{filename}`")
-            raise ValueError(
-                f"Incorrect link\n Problem Note: {note.filename}\n Link not found locally: {match.group(0)}"
+            # Find similar filenames using fuzzy matching
+            similar_files = process.extract(
+                filename,
+                path_to_remote.keys(),
+                limit=5,
+                score_cutoff=50  # Only show reasonably similar matches
             )
+            
+            error_text = Text()
+            error_text.append("\nBroken link in ", style="red bold")
+            error_text.append(note.filename, style="yellow")
+            error_text.append(f"\nCannot find: ", style="red")
+            error_text.append(match.group(0), style="yellow")
+            console.print(error_text)
+            
+            if similar_files:
+                suggestions = Panel(
+                    "\n".join([
+                        f"[yellow]Did you mean:[/yellow]",
+                        *[f"[green]{name}[/green] ({int(score)}% match)" for name, score, _ in similar_files]
+                    ]),
+                    title="Suggestions",
+                    border_style="blue"
+                )
+                console.print(suggestions)
+            
+            raise HandledBuildError()
+            
         remote_path = path_to_remote[filename]
         to_replace.append((text, local_link, remote_path))
 
