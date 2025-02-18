@@ -89,12 +89,13 @@ class FootnoteParser:
     @classmethod
     def reorder(cls, text: str) -> str:
         """Reorder footnotes in the text to be sequential based on appearance.
+        Also ensures footnote definitions are arranged in numerical order.
 
         Args:
             text: The markdown text to reorder footnotes in
 
         Returns:
-            Text with reordered footnotes
+            Text with reordered footnotes and definitions
         """
         references = cls.find_references(text)
         definitions = cls.find_definitions(text)
@@ -103,8 +104,10 @@ class FootnoteParser:
             return text
 
         number_map = cls.create_renumbering_map(references)
+        # Create reverse mapping for definition ordering
+        reverse_map = {new: old for old, new in number_map.items()}
 
-        # Create a list of all replacements to make
+        # Create a list of all replacements to make for references
         replacements = []
         for old_num, new_num in number_map.items():
             # Add reference replacements (not definitions)
@@ -114,23 +117,82 @@ class FootnoteParser:
                     for match in re.finditer(f"\\[\\^{old_num}\\](?!:)", text)
                 ]
             )
-            # Add definition replacements
-            replacements.extend(
-                [
-                    (match.start(), match.end(), f"[^{new_num}]:")
-                    for match in re.finditer(f"\\[\\^{old_num}\\]:", text)
-                ]
-            )
 
         # Sort replacements by position in reverse order to maintain string indices
         replacements.sort(key=lambda x: x[0], reverse=True)
 
-        # Apply replacements from end to start to avoid index shifting
+        # Apply reference replacements from end to start to avoid index shifting
         result = text
         for start, end, replacement in replacements:
             result = result[:start] + replacement + result[end:]
 
-        return result
+        # Now handle reordering the definitions
+        # First, create a mapping of old numbers to their content and indentation
+        definition_map = {}
+        lines = result.split("\n")
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            match = re.match(r"^(\s*)\[\^(\d+)\]:\s*(.*)$", line)
+            if match:
+                indent, num, content = match.groups()
+                multiline_content = [content]
+                i += 1
+                # Collect any continuation lines
+                while i < len(lines):
+                    next_line = lines[i]
+                    if not next_line.strip() or re.match(r"^\s*\[\^", next_line):
+                        break
+                    # Preserve the content without the leading spaces
+                    multiline_content.append(next_line.strip())
+                    i += 1
+                definition_map[num] = {"content": "\n".join(multiline_content), "indent": indent}
+                continue
+            i += 1
+
+        # Find the start of the definitions section
+        definitions_start = None
+        for i, line in enumerate(lines):
+            if re.match(r"^\s*\[\^", line):
+                definitions_start = i
+                break
+
+        if definitions_start is not None:
+            # Create new ordered definitions
+            new_definitions = []
+            base_indent = definition_map[next(iter(definition_map))]["indent"]
+
+            # Sort by new number to maintain numerical order
+            for new_num in sorted(
+                (
+                    num
+                    for old_num in definition_map.keys()
+                    if old_num in number_map
+                    for num in [number_map[old_num]]
+                ),
+                key=int,
+            ):
+                old_num = reverse_map[new_num]
+                if old_num in definition_map:
+                    def_info = definition_map[old_num]
+                    content_lines = def_info["content"].split("\n")
+                    # First line with footnote marker
+                    new_definitions.append(f"{base_indent}[^{new_num}]: {content_lines[0]}")
+                    # Continuation lines
+                    for cont_line in content_lines[1:]:
+                        new_definitions.append(f"{base_indent}{cont_line}")
+
+            # Replace the old definitions section
+            while definitions_start < len(lines):
+                if not lines[definitions_start].strip():
+                    break
+                lines[definitions_start] = ""
+                definitions_start += 1
+
+            # Insert new definitions
+            lines[definitions_start - len(new_definitions) : definitions_start] = new_definitions
+
+        return "\n".join(lines)
 
     @classmethod
     def has_footnotes(cls, text: str) -> bool:

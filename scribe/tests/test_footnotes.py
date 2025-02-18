@@ -49,23 +49,6 @@ def test_create_renumbering_map():
     assert number_map == {"1": "1", "5": "2", "10": "3"}
 
 
-def test_reorder_simple():
-    """Test reordering of simple footnotes."""
-    text = """
-    Here is a[^2] footnote and here is[^1] another one.
-
-    [^2]: Second footnote
-    [^1]: First footnote
-    """
-    expected = """
-    Here is a[^1] footnote and here is[^2] another one.
-
-    [^1]: Second footnote
-    [^2]: First footnote
-    """
-    assert FootnoteParser.reorder(text) == expected
-
-
 def test_reorder_complex():
     """Test reordering of complex footnotes with multi-digit numbers."""
     text = """
@@ -78,9 +61,9 @@ def test_reorder_complex():
     expected = """
     First[^1], second[^2], third[^3].
 
-    [^3]: Third note
-    [^2]: Second note
     [^1]: First note
+    [^2]: Second note
+    [^3]: Third note
     """
     assert FootnoteParser.reorder(text) == expected
 
@@ -124,3 +107,37 @@ def test_definitions_without_references():
     [^1]: A definition without reference
     """
     assert FootnoteParser.reorder(text) == text
+
+
+def test_reorder_definitions_order():
+    """Test that footnote definitions are reordered to match their numerical order."""
+    text = """
+    Here is a[^2] footnote and here is[^1] another one.
+
+    [^2]: Second footnote
+    [^1]: First footnote
+    """
+    expected = """
+    Here is a[^1] footnote and here is[^2] another one.
+
+    [^1]: Second footnote
+    [^2]: First footnote
+    """
+    assert FootnoteParser.reorder(text) == expected
+
+    # Test with non-sequential numbers
+    text = """
+    First[^10], second[^2], third[^5].
+
+    [^5]: Third note
+    [^10]: First note
+    [^2]: Second note
+    """
+    expected = """
+    First[^1], second[^2], third[^3].
+
+    [^1]: First note
+    [^2]: Second note
+    [^3]: Third note
+    """
+    assert FootnoteParser.reorder(text) == expected
