@@ -2,18 +2,20 @@ from multiprocessing import Process
 from os import environ, system
 from pathlib import Path
 
+import uvicorn
 from click import (
-    Path as ClickPath,
-)
-from click import (
+    Context,
     command,
     option,
     secho,
+    pass_context,
 )
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from starlette.responses import FileResponse
 from watchfiles import Change, watch
 
 from scribe.builder import WebsiteBuilder
-from scribe.cli.runserver import runserver
 from scribe.io import get_asset_path
 
 
@@ -82,13 +84,40 @@ class NotesBuilder:
         secho("Done.", fg="green")
 
 
+def runserver(directory, port):
+    """
+    Local preview of website
+    """
+    app = FastAPI()
+    directory = Path(directory)
+
+    @app.get("/{path:path}")
+    def read_root(path):
+        # Blank paths should be index files
+        if path == "":
+            path = "index"
+
+        # Proxy html files that are stored locally
+        if "." not in path:
+            path = f"{path}.html"
+
+        path = directory / path
+
+        if not path.exists():
+            return HTMLResponse(status_code=400)
+
+        return FileResponse(path)
+
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+
 @command()
-@option("--notes", type=ClickPath(dir_okay=True), required=True)
 @option("--output", default="static")
 @option("--port", default=3100)
 @option("--env", default="DEVELOPMENT")
-def main(notes: str, output: str, port: int, env: str):
-    notes_path = Path(notes).expanduser().absolute()
+@pass_context
+def start_writing(ctx: Context, output: str, port: int, env: str):
+    notes_path = Path(ctx.obj["notes"]).expanduser().absolute()
     secho(f"Starting server with notes from: {notes_path}", fg="green")
 
     # Launch the server
@@ -106,7 +135,7 @@ def main(notes: str, output: str, port: int, env: str):
     )
     style_process.start()
 
-    builder = NotesBuilder(notes, output, env)
+    builder = NotesBuilder(notes_path, output, env)
 
     # Initial build
     builder.build()

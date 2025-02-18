@@ -38,8 +38,7 @@ dev = [
 ]
 
 [project.scripts]
-start-writing = "scribe.cli.launch:main"
-build-notes = "scribe.cli.build:main"
+scribe = "scribe.cli.cli:main"
 
 [build-system]
 requires = ["hatchling"]
