@@ -6,7 +6,7 @@ class FootnoteParser:
     """Parser for handling markdown footnotes and their reordering."""
 
     REFERENCE_PATTERN = r"\[\^(\d+)\]"
-    DEFINITION_PATTERN = r"\[\^(\d+)\]:\s*((?:[^\n][\n]?(?![\n]|\[\^\d+\]:))*)"
+    DEFINITION_START_PATTERN = r"^\s*\[\^(\d+)\]:\s*(.*)$"
 
     @classmethod
     def find_references(cls, text: str) -> List[Tuple[str, int]]:
@@ -34,8 +34,38 @@ class FootnoteParser:
         Returns:
             List of tuples containing (footnote_id, content, position)
         """
-        matches = re.finditer(cls.DEFINITION_PATTERN, text)
-        return [(match.group(1), match.group(2).strip(), match.start()) for match in matches]
+        definitions = []
+        lines = text.split("\n")
+        current_definition = None
+        current_content = []
+        current_position = 0
+        line_position = 0
+
+        for line in lines:
+            match = re.match(cls.DEFINITION_START_PATTERN, line)
+            if match:
+                # If we were building a previous definition, save it
+                if current_definition:
+                    definitions.append(
+                        (current_definition, "\n".join(current_content).strip(), current_position)
+                    )
+                # Start new definition
+                current_definition = match.group(1)
+                current_content = [match.group(2)]
+                current_position = line_position
+            elif current_definition and line.strip() and not re.match(r"^\s*\[\^", line):
+                # Continue multi-line definition if line is not empty and not a new definition
+                current_content.append(line.strip())
+
+            line_position += len(line) + 1  # +1 for the newline
+
+        # Add the last definition if there is one
+        if current_definition:
+            definitions.append(
+                (current_definition, "\n".join(current_content).strip(), current_position)
+            )
+
+        return definitions
 
     @classmethod
     def create_renumbering_map(cls, references: List[Tuple[str, int]]) -> Dict[str, str]:
@@ -48,7 +78,13 @@ class FootnoteParser:
             Dictionary mapping old footnote numbers to new sequential numbers
         """
         sorted_refs = sorted(references, key=lambda x: x[1])
-        return {old_num: str(i + 1) for i, (old_num, _) in enumerate(sorted_refs)}
+        unique_refs = []
+        seen = set()
+        for ref in sorted_refs:
+            if ref[0] not in seen:
+                unique_refs.append(ref)
+                seen.add(ref[0])
+        return {old_num: str(i + 1) for i, (old_num, _) in enumerate(unique_refs)}
 
     @classmethod
     def reorder(cls, text: str) -> str:
@@ -68,14 +104,33 @@ class FootnoteParser:
 
         number_map = cls.create_renumbering_map(references)
 
-        # Replace references and definitions, starting with longest numbers first
-        # to avoid partial replacements
-        for old_num in sorted(number_map.keys(), key=len, reverse=True):
-            new_num = number_map[old_num]
-            text = re.sub(f"\\[\\^{old_num}\\](?!:)", f"[^{new_num}]", text)
-            text = re.sub(f"\\[\\^{old_num}\\]:", f"[^{new_num}]:", text)
+        # Create a list of all replacements to make
+        replacements = []
+        for old_num, new_num in number_map.items():
+            # Add reference replacements (not definitions)
+            replacements.extend(
+                [
+                    (match.start(), match.end(), f"[^{new_num}]")
+                    for match in re.finditer(f"\\[\\^{old_num}\\](?!:)", text)
+                ]
+            )
+            # Add definition replacements
+            replacements.extend(
+                [
+                    (match.start(), match.end(), f"[^{new_num}]:")
+                    for match in re.finditer(f"\\[\\^{old_num}\\]:", text)
+                ]
+            )
 
-        return text
+        # Sort replacements by position in reverse order to maintain string indices
+        replacements.sort(key=lambda x: x[0], reverse=True)
+
+        # Apply replacements from end to start to avoid index shifting
+        result = text
+        for start, end, replacement in replacements:
+            result = result[:start] + replacement + result[end:]
+
+        return result
 
     @classmethod
     def has_footnotes(cls, text: str) -> bool:

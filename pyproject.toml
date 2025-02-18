@@ -25,18 +25,6 @@ dependencies = [
     "rapidfuzz>=3.6.1",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.3.1",
-    "ruff>=0.9.5",
-    "types-beautifulsoup4>=4.12.0.5",
-    "types-PyYAML>=6.0.12.9",
-    "types-Markdown>=3.4.2.9",
-    "types-python-dateutil>=2.8.19.13",
-    "types-Pillow>=9.5.0.4",
-    "djlint>=1.35.2",
-]
-
 [project.scripts]
 scribe = "scribe.cli.cli:main"
 
@@ -56,4 +44,11 @@ ignore = ["E501"]
 dev = [
     "pyright>=1.1.393",
     "ruff>=0.9.5",
+    "pytest>=7.3.1",
+    "types-beautifulsoup4>=4.12.0.5",
+    "types-PyYAML>=6.0.12.9",
+    "types-Markdown>=3.4.2.9",
+    "types-python-dateutil>=2.8.19.13",
+    "types-Pillow>=9.5.0.4",
+    "djlint>=1.35.2",
 ]

@@ -7,8 +7,8 @@ from click import (
     Context,
     command,
     option,
-    secho,
     pass_context,
+    secho,
 )
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse

@@ -1,5 +1,5 @@
+from click import Context, group, option, pass_context
 from click import Path as ClickPath
-from click import group, option, Context, pass_context
 
 from scribe.cli.build import build
 from scribe.cli.format import format

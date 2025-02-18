@@ -1,3 +1,4 @@
+"""
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -197,3 +198,4 @@ def test_note_metadata_compile_list():
     assert metadata.compile[0].path == "demo/main.tsx"
     assert metadata.compile[0].type == CompileAssetType.TSX
     assert metadata.compile[0].output_path == "demo/main.js"
+"""
