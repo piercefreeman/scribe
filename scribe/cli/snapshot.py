@@ -11,18 +11,22 @@ console = Console()
 
 
 @command()
-@option("--snapshots", default="snapshots", help="Directory to store webpage snapshots")
+@option(
+    "--snapshots",
+    default="snapshots",
+    help="Directory to store webpage snapshots (relative to notes directory)",
+)
 @option(
     "--headful",
     is_flag=True,
-    default=False,
-    help="Show browser window during snapshot (useful for debugging)",
+    default=True,
+    help="Show browser window during snapshot",
 )
 @pass_context
 def snapshot_links(ctx: Context, snapshots: str, headful: bool):
     """Take snapshots of all external links found in markdown notes."""
     notes_path = Path(ctx.obj["notes"]).expanduser()
-    snapshots_path = Path(snapshots).expanduser()
+    snapshots_path = notes_path / snapshots
 
     # Get all notes
     builder = WebsiteBuilder()

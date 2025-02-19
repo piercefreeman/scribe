@@ -1,4 +1,6 @@
+import json
 from asyncio import Semaphore, create_task, gather
+from datetime import datetime
 from hashlib import md5
 from pathlib import Path
 from re import finditer, sub
@@ -73,37 +75,58 @@ async def snapshot_url(
 
     async with semaphore:
         try:
-            from subprocess import PIPE
-            from subprocess import run as subprocess_run
+            from asyncio import create_subprocess_exec
+            from asyncio.subprocess import PIPE
 
             console.print(f"[yellow]Taking snapshot of {url}[/yellow]")
 
             # Create the output directory
             output_path.mkdir(parents=True, exist_ok=True)
 
+            # Create the full path for the snapshot file
+            snapshot_file = output_path / "snapshot.html"
+            metadata_file = output_path / "metadata.json"
+
             cmd = [
                 "npx",
                 "single-file-cli",
                 url,
-                str(output_path / "snapshot.html"),
+                str(snapshot_file),
                 "--browser-executable-path",
                 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "--browser-load-max-time",
+                str(15 * 1000),
             ]
 
             if not headful:
                 cmd.extend(["--browser-args", '["--headless=new"]'])
+            else:
+                cmd.extend(["--browser-headless", "false"])
 
-            result = subprocess_run(
-                cmd,
+            console.print(f"[yellow]Running command: {' '.join(cmd)}[/yellow]")
+
+            process = await create_subprocess_exec(
+                *cmd,
                 stdout=PIPE,
                 stderr=PIPE,
             )
+            stdout, stderr = await process.communicate()
 
-            if result.returncode == 0:
-                # The file is already written by single-file-cli
-                console.print(f"[green]Successfully snapshotted {url}[/green]")
+            if process.returncode == 0:
+                # Verify the file was created
+                if snapshot_file.exists():
+                    # Save metadata
+                    metadata = {"crawled_date": datetime.now().isoformat(), "original_url": url}
+                    metadata_file.write_text(json.dumps(metadata, indent=2))
+
+                    console.print(f"[green]Successfully snapshotted {url}[/green]")
+                else:
+                    console.print(f"[red]Failed to snapshot {url}: File not created[/red]")
+                    console.print(f"[red]stderr: {stderr.decode()}[/red]")
+                    console.print(f"[red]stdout: {stdout.decode()}[/red]")
             else:
-                console.print(f"[red]Failed to snapshot {url}: {result.stderr.decode()}[/red]")
+                console.print(f"[red]Failed to snapshot {url}: {stderr.decode()}[/red]")
+                console.print(f"[red]stdout: {stdout.decode()}[/red]")
         except Exception as e:
             console.print(f"[red]Error snapshotting {url}: {str(e)}[/red]")
 
@@ -123,3 +146,5 @@ async def snapshot_urls(
     semaphore = Semaphore(max_concurrent)
     tasks = [create_task(snapshot_url(url, output_dir, semaphore, headful)) for url in urls]
     await gather(*tasks)
+
+    console.print("[green]All snapshots completed successfully[/green]")

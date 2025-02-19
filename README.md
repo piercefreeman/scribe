@@ -49,6 +49,8 @@ uv sync
 npm install
 ```
 
+## Commands
+
 When writing, use the auto-refresh utility:
 
 ```bash
@@ -59,6 +61,18 @@ If you'd like to build without the full CLI:
 
 ```bash
 uv run scribe --notes public build
+```
+
+If you want to number footnotes correctly based on the order they're cited in the post:
+
+```bash
+uv run scribe --notes public format
+```
+
+When you want to snapshot the all ahrefs for archival embedding within the page:
+
+```bash
+uv run scribe --notes public snapshot-links
 ```
 
 ## ZSH Shortcuts

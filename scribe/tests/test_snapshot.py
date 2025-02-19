@@ -75,7 +75,8 @@ meta:
     note_path = notes_dir / "test.md"
     note_path.write_text(text)
 
-    snapshots_dir = tmp_path / "snapshots"
+    # Snapshots will be created inside the notes directory
+    snapshots_dir = notes_dir / "snapshots"
 
     # Change to the temp directory for the test
     original_dir = Path.cwd()
@@ -90,7 +91,7 @@ meta:
 
         result = runner.invoke(
             snapshot_links,
-            ["--snapshots", str(snapshots_dir)] + (["--headful"] if headful else []),
+            ["--snapshots", "snapshots"] + (["--headful"] if headful else []),
             obj={"notes": str(notes_dir)},
             catch_exceptions=False,
         )
@@ -119,6 +120,9 @@ meta:
                 console.print(f"[yellow]Contents of {snapshots_dir}:[/yellow]")
                 for path in snapshots_dir.rglob("*"):
                     console.print(f"[blue]Found:[/blue] {path}")
+                    if path.is_file():
+                        console.print("[green]File contents:[/green]")
+                        console.print(path.read_text())
             else:
                 console.print(f"[red]Snapshots directory does not exist: {snapshots_dir}[/red]")
 
@@ -134,6 +138,22 @@ meta:
         assert "<html" in content.lower()
         assert "<body" in content.lower()
         assert "example domain" in content.lower()
+
+        # Verify metadata.json exists and has correct format
+        metadata_path = snapshots_dir / get_url_hash("https://example.com") / "metadata.json"
+        assert metadata_path.exists()
+
+        import json
+
+        metadata = json.loads(metadata_path.read_text())
+        assert "crawled_date" in metadata
+        assert "original_url" in metadata
+        assert metadata["original_url"] == "https://example.com"
+
+        # Verify crawled_date is a valid ISO format date
+        from datetime import datetime
+
+        datetime.fromisoformat(metadata["crawled_date"])
     finally:
         # Always restore the original directory
         chdir(original_dir)
