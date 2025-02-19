@@ -4,11 +4,10 @@ from pathlib import Path
 from shutil import rmtree
 
 from click import (
-    Path as ClickPath,
-)
-from click import (
+    Context,
     command,
     option,
+    pass_context,
     secho,
 )
 
@@ -16,7 +15,7 @@ from scribe.builder import WebsiteBuilder
 from scribe.io import get_asset_path
 
 
-def build(notes_path, output_path):
+def build(notes_path: str, output_path: str):
     secho("Building new output...", fg="yellow")
 
     builder = WebsiteBuilder()
@@ -26,15 +25,16 @@ def build(notes_path, output_path):
 
 
 @command()
-@option("--notes", type=ClickPath(exists=True, dir_okay=True), required=True)
 @option("--output", default="static")
 @option("--clean", is_flag=True, default=False)
 @option("--env", default="PRODUCTION")
-def main(notes: str, output: str, clean: bool, env: str):
+@pass_context
+def build(ctx: Context, output: str, clean: bool, env: str):
     environ["SCRIBE_ENVIRONMENT"] = env
     secho(f"Environment: {env}")
 
-    environ["MARKDOWN_PATH"] = str(Path(notes).expanduser().absolute())
+    notes_path = Path(ctx.obj["notes"]).expanduser().absolute()
+    environ["MARKDOWN_PATH"] = str(notes_path)
 
     # Build the styles
     command = f"cd {get_asset_path('../')} && npm run styles-build"
@@ -63,4 +63,4 @@ def main(notes: str, output: str, clean: bool, env: str):
             for item in Path(output).glob("**/*.html"):
                 unlink(item)
 
-    builder.build(notes, output)
+    builder.build(notes_path, output)
