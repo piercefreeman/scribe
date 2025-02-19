@@ -245,7 +245,6 @@ meta:
         # tag - so tailwind can pick up on them)
         for img in content.find_all("img"):
             image_classes = img.get("class", [])
-            image_classes.append("rounded-lg shadow-lg border-4 border-white dark:border-slate-600")
 
             # Travel specific styling
             if "travel" in self.metadata.tags:
