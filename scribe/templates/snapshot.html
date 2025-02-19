@@ -9,6 +9,15 @@
     </div>
 </template>
 
+<!-- Command Hint Template -->
+<template id="command-hint-template">
+    <div class="fixed bottom-8 right-8 bg-gray-800 dark:bg-white/15 px-6 py-3 rounded-lg shadow-lg backdrop-blur-sm opacity-0 transition-opacity duration-200 flex items-center gap-3 z-10">
+        <kbd class="px-2.5 py-1.5 text-xs font-medium text-white dark:text-white/90 bg-gray-700 dark:bg-white/10 border border-gray-600 dark:border-white/20 rounded-md">
+        </kbd>
+        <span class="text-sm text-white dark:text-white/90">to Preview</span>
+    </div>
+</template>
+
 <!-- Fullscreen Iframe Modal -->
 <div id="snapshot-modal" class="fixed inset-0 bg-black/5 backdrop-blur-xs opacity-0 pointer-events-none items-center justify-center z-50 transition-all duration-300">
     <div class="relative w-11/12 h-5/6 bg-white dark:bg-slate-900 rounded-lg shadow-2xl transform transition-transform duration-300 scale-95 flex flex-col">
@@ -33,6 +42,11 @@
 </div>
 
 <script type="text/javascript">
+    // Detect OS for keyboard shortcut display
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const modifierKey = isMac ? '⌘' : 'Ctrl';
+    const shortcutKey = 'K';
+    
     function formatDate(isoString) {
         const date = new Date(isoString);
         return date.toLocaleDateString(undefined, { 
@@ -69,40 +83,42 @@
     }
 
     function setupSnapshotPreviews() {
-        const template = document.getElementById('snapshot-preview-template');
+        const template = document.getElementById('command-hint-template');
         const modal = document.getElementById('snapshot-modal');
         const iframe = document.getElementById('snapshot-iframe');
         const closeButton = document.getElementById('snapshot-close');
 
+        // Create and add command hint to body
+        const commandHint = template.content.cloneNode(true).firstElementChild;
+        commandHint.querySelector('kbd').textContent = `${modifierKey}+${shortcutKey}`;
+        document.body.appendChild(commandHint);
+
+        let activeLink = null;
+
         // Find all links with snapshot-id
         document.querySelectorAll('a[snapshot-id]').forEach(link => {
-            // Add group class for hover functionality
-            link.classList.add('group');
-            
-            // Create preview element
-            const preview = template.content.cloneNode(true).firstElementChild;
-            const snapshotId = link.getAttribute('snapshot-id');
-            const snapshotDate = link.getAttribute('data-snapshot-date');
-            
-            // Setup link container for proper hover positioning
-            link.appendChild(preview);
-
-            // Center the preview over the text content
-            requestAnimationFrame(() => {
-                const linkRect = link.getBoundingClientRect();
-                const previewRect = preview.getBoundingClientRect();
-                const offset = (previewRect.width - linkRect.width) / 2;
-                preview.style.left = `-${offset}px`;
+            // Hover handlers
+            link.addEventListener('mouseenter', () => {
+                activeLink = link;
+                commandHint.style.opacity = '1';
             });
 
-            // Preview click handler
-            preview.addEventListener('click', (e) => {
+            link.addEventListener('mouseleave', () => {
+                activeLink = null;
+                commandHint.style.opacity = '0';
+            });
+        });
+
+        // Keyboard shortcut handler
+        document.addEventListener('keydown', (e) => {
+            const isModifier = isMac ? e.metaKey : e.ctrlKey;
+            if (isModifier && e.key.toLowerCase() === 'k' && activeLink) {
                 e.preventDefault();
-                e.stopPropagation();
-                
+                const snapshotId = activeLink.getAttribute('snapshot-id');
+                const snapshotDate = activeLink.getAttribute('data-snapshot-date');
                 iframe.src = `/snapshots/${snapshotId}/snapshot.html`;
                 showModal(modal, snapshotId, snapshotDate);
-            });
+            }
         });
 
         // Setup open in new tab handler
