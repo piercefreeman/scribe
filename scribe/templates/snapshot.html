@@ -1,0 +1,135 @@
+<!-- Snapshot Preview Template -->
+<template id="snapshot-preview-template">
+    <div class="snapshot-preview absolute -top-2 left-0 bg-white dark:bg-slate-800 px-4 py-2 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 opacity-0 transition-opacity duration-200 flex items-center gap-2 whitespace-nowrap z-10">
+        <svg class="h-4 w-4 text-gray-500 dark:text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+        </svg>
+        <span class="text-sm text-gray-700 dark:text-slate-300">Preview</span>
+        <span class="text-xs text-gray-500 dark:text-slate-400 snapshot-date"></span>
+    </div>
+</template>
+
+<!-- Fullscreen Iframe Modal -->
+<div id="snapshot-modal" class="fixed inset-0 bg-black/5 backdrop-blur-xs opacity-0 pointer-events-none items-center justify-center z-50 transition-all duration-300">
+    <div class="relative w-11/12 h-5/6 bg-white dark:bg-slate-900 rounded-lg shadow-2xl transform transition-transform duration-300 scale-95">
+        <button id="snapshot-close" class="absolute -top-12 right-0 text-gray-800 dark:text-gray-200 hover:text-gray-300 focus:outline-none">
+            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+        <iframe id="snapshot-iframe" class="w-full h-full rounded-lg"></iframe>
+    </div>
+</div>
+
+<script type="text/javascript">
+    function formatDate(isoString) {
+        const date = new Date(isoString);
+        return date.toLocaleDateString(undefined, { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+    }
+
+    function showModal(modal) {
+        modal.style.display = 'flex';
+        // Small delay to ensure display:flex is applied before transitions
+        requestAnimationFrame(() => {
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modal.querySelector('.relative').classList.remove('scale-95');
+        });
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideModal(modal) {
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        modal.querySelector('.relative').classList.add('scale-95');
+        document.body.style.overflow = 'auto';
+        // Wait for transition to complete before hiding
+        setTimeout(() => {
+            modal.style.display = 'none';
+            modal.querySelector('iframe').src = 'about:blank';
+        }, 300);
+    }
+
+    function setupSnapshotPreviews() {
+        const template = document.getElementById('snapshot-preview-template');
+        const modal = document.getElementById('snapshot-modal');
+        const iframe = document.getElementById('snapshot-iframe');
+        const closeButton = document.getElementById('snapshot-close');
+
+        // Find all links with snapshot-id
+        document.querySelectorAll('a[snapshot-id]').forEach(link => {
+            // Create preview element
+            const preview = template.content.cloneNode(true).firstElementChild;
+            preview.querySelector('.snapshot-date').textContent = 
+                `Archived ${formatDate(link.getAttribute('data-snapshot-date'))}`;
+            
+            // Setup link container for proper hover positioning
+            link.style.position = 'relative';
+            link.appendChild(preview);
+
+            // Hover effects
+            link.addEventListener('mouseenter', () => {
+                preview.style.opacity = '1';
+            });
+            link.addEventListener('mouseleave', () => {
+                preview.style.opacity = '0';
+            });
+
+            // Preview click handler
+            preview.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const snapshotId = link.getAttribute('snapshot-id');
+                iframe.src = `/snapshots/${snapshotId}/snapshot.html`;
+                showModal(modal);
+            });
+        });
+
+        // Close modal handler
+        closeButton.addEventListener('click', () => {
+            hideModal(modal);
+        });
+
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideModal(modal);
+            }
+        });
+
+        // Close on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                hideModal(modal);
+            }
+        });
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', setupSnapshotPreviews);
+</script>
+
+<style>
+    /* Prevent iframe from showing scrollbars when loading */
+    #snapshot-iframe {
+        border: none;
+        background: white;
+    }
+
+    /* Smooth hover transitions */
+    .snapshot-preview {
+        pointer-events: auto;
+        transform: translateY(-100%);
+    }
+
+    /* Ensure preview is clickable */
+    a[snapshot-id] {
+        text-decoration-style: dotted;
+        text-decoration-thickness: from-font;
+        text-underline-offset: 2px;
+    }
+</style> 
