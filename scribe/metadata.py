@@ -1,10 +1,10 @@
 from datetime import datetime
 from enum import Enum, unique
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional, Union
 
 from dateutil import parser as date_parser
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, field_validator, model_validator
 
 from scribe.asset import Asset
 
@@ -70,21 +70,14 @@ class CompileAsset(BaseModel):
     """
 
     path: str
-    type: CompileAssetType
+    type: Annotated[
+        CompileAssetType,
+        BeforeValidator(lambda x: CompileAssetType(x) if isinstance(x, str) else x),
+    ]
     output_path: str
-
     asset: Optional[Asset] = None
+
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    @field_validator("type", mode="before")
-    def validate_type(self, type_value):
-        if isinstance(type_value, CompileAssetType):
-            return type_value
-
-        try:
-            return CompileAssetType(type_value)
-        except ValueError as e:
-            raise ValueError(f"Unknown compile asset type: `{type_value}`") from e
 
     @classmethod
     def _get_output_extension(cls, type: CompileAssetType) -> str:
@@ -117,20 +110,17 @@ class CompileAsset(BaseModel):
 
         return cls(path=str(path_obj), type=asset_type, output_path=str(output_path))
 
+    @model_validator(mode="before")
     @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
-        if isinstance(v, str):
-            return cls._from_path(v)
-        elif isinstance(v, dict):
-            return cls(**v)
-        elif isinstance(v, cls):
-            return v
+    def validate_input(cls, value: Union[str, dict, "CompileAsset"]) -> dict:
+        if isinstance(value, str):
+            return cls._from_path(value).model_dump()
+        elif isinstance(value, dict):
+            return value
+        elif isinstance(value, cls):
+            return value.model_dump()
         else:
-            raise ValueError(f"Invalid CompileAsset format: {v}")
+            raise ValueError(f"Invalid CompileAsset format: {value}")
 
 
 class BuildMetadata(BaseModel):

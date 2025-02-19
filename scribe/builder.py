@@ -179,6 +179,10 @@ class WebsiteBuilder:
             output_file = output_path / "notes" / f"{note.webpage_path}.html"
 
             # Skip if already built and source hasn't changed
+            if not note.path:
+                console.print(f"[yellow]Skipping {note.title} due to missing path[/yellow]")
+                continue
+
             if not self.build_state.needs_rebuild(note.path):
                 continue
 

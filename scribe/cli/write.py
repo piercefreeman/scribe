@@ -135,7 +135,7 @@ def start_writing(ctx: Context, output: str, port: int, env: str):
     )
     style_process.start()
 
-    builder = NotesBuilder(notes_path, output, env)
+    builder = NotesBuilder(str(notes_path), output, env)
 
     # Initial build
     builder.build()
