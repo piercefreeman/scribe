@@ -1,5 +1,6 @@
 import json
-from asyncio import Semaphore, create_task, gather
+from asyncio import Semaphore, create_task, gather, wait_for
+from asyncio import TimeoutError as AsyncTimeoutError
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import md5
@@ -172,17 +173,27 @@ async def snapshot_url(
                 stdout=PIPE,
                 stderr=PIPE,
             )
-            stdout, stderr = await process.communicate()
 
-            success = False
-            error_message = None
+            try:
+                stdout, stderr = await wait_for(process.communicate(), timeout=75)
+                success = False
+                error_message = None
 
-            if process.returncode == 0 and snapshot_file.exists():
-                success = True
-                console.print(f"[green]Successfully snapshotted {url}[/green]")
-            else:
-                error_message = stderr.decode() or stdout.decode() or "Unknown error"
-                console.print(f"[red]Failed to snapshot {url}: {error_message}[/red]")
+                if process.returncode == 0 and snapshot_file.exists():
+                    success = True
+                    console.print(f"[green]Successfully snapshotted {url}[/green]")
+                else:
+                    error_message = stderr.decode() or stdout.decode() or "Unknown error"
+                    console.print(f"[red]Failed to snapshot {url}: {error_message}[/red]")
+
+            except AsyncTimeoutError:
+                error_message = "Process timed out after 75 seconds"
+                console.print(f"[red]Timeout error for {url}: {error_message}[/red]")
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+                success = False
 
             # Save metadata
             metadata = SnapshotMetadata(
