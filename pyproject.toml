@@ -52,3 +52,9 @@ dev = [
     "types-Pillow>=9.5.0.4",
     "djlint>=1.35.2",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests that require external services or are integration tests",
+]
+addopts = "-m 'not integration'"

@@ -4,30 +4,38 @@ from scribe.builder import WebsiteBuilder
 from scribe.metadata import BuildMetadata, NoteStatus
 from scribe.models import TemplateArguments
 from scribe.note import Note
+from scribe.tests.common import create_test_note
+import pytest
 
-SCRATCH_NOTE = """
-# Scratch Note
+@pytest.fixture
+def scratch_note() -> str:
+    return create_test_note(
+        header="Scratch Note",
+        body="This is a scratch note.",
+        meta={
+            "date": "September 27, 2022",
+            "status": "scratch"
+        }
+    )
 
-This is a scratch note.
-"""
-
-DRAFT_NOTE = """
-# Draft Note
-
-meta:
-    date: September 27, 2022
-    status: draft
-
-This is a draft note.
-"""
+@pytest.fixture
+def draft_note() -> str:
+    return create_test_note(
+        header="Draft Note",
+        body="This is a draft note.",
+        meta={
+            "date": "September 27, 2022",
+            "status": "draft"
+        }
+    )
 
 
-def test_exclude_scratch(builder: WebsiteBuilder, note_directory: Path):
+def test_exclude_scratch(builder: WebsiteBuilder, note_directory: Path, scratch_note: Note, draft_note: Note):
     """
     Test that excluded notes are not published
     """
-    (note_directory / "scratch_note.md").write_text(SCRATCH_NOTE)
-    (note_directory / "draft_note.md").write_text(DRAFT_NOTE)
+    (note_directory / "scratch_note.md").write_text(scratch_note)
+    (note_directory / "draft_note.md").write_text(draft_note)
 
     notes = builder.get_notes(note_directory)
     assert len(notes) == 1
@@ -35,7 +43,7 @@ def test_exclude_scratch(builder: WebsiteBuilder, note_directory: Path):
     assert notes[0].metadata.status == NoteStatus.DRAFT
 
 
-def test_skip_hidden_directories(builder: WebsiteBuilder, note_directory: Path):
+def test_skip_hidden_directories(builder: WebsiteBuilder, note_directory: Path, draft_note: Note):
     """
     Test that files in hidden directories (starting with .) are skipped
     """
@@ -44,10 +52,10 @@ def test_skip_hidden_directories(builder: WebsiteBuilder, note_directory: Path):
     hidden_dir.mkdir()
 
     # Create a note in the hidden directory
-    (hidden_dir / "hidden_note.md").write_text(DRAFT_NOTE)
+    (hidden_dir / "hidden_note.md").write_text(draft_note)
 
     # Create a note in the main directory
-    (note_directory / "visible_note.md").write_text(DRAFT_NOTE)
+    (note_directory / "visible_note.md").write_text(draft_note)
 
     notes = builder.get_notes(note_directory)
     assert len(notes) == 1

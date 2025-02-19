@@ -53,6 +53,7 @@ More links:
     }
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("headful", [True, False])
 def test_snapshot_example(tmp_path: Path, headful: bool):
     """Test that we can successfully snapshot example.com."""

@@ -148,13 +148,15 @@ class NoteMetadata(BaseModel):
     compile: list[CompileAsset] = []
 
     @field_validator("date", mode="before")
-    def validate_date(self, date):
+    @classmethod
+    def validate_date(cls, date):
         if isinstance(date, datetime):
             return date
         return date_parser.parse(date)
 
     @field_validator("status", mode="before")
-    def validate_status(self, status):
+    @classmethod
+    def validate_status(cls, status):
         if isinstance(status, NoteStatus):
             return status
 
@@ -166,7 +168,8 @@ class NoteMetadata(BaseModel):
             raise ValueError(f"Unknown status: `{status}`")
 
     @field_validator("compile", mode="before")
-    def validate_compile(self, compile_assets):
+    @classmethod
+    def validate_compile(cls, compile_assets):
         if not compile_assets:
             return []
 
