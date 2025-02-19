@@ -20,7 +20,7 @@ def test_remote_link_http(note_directory):
     new_text = local_to_remote_links(
         Note.from_text(text=text, path=note_directory / "note.md"), local_mapping
     )
-    new_text == text
+    assert new_text == text
 
 
 def test_remote_link_www(note_directory):
@@ -30,4 +30,4 @@ def test_remote_link_www(note_directory):
     new_text = local_to_remote_links(
         Note.from_text(text=text, path=note_directory / "note.md"), local_mapping
     )
-    new_text == text
+    assert new_text == text

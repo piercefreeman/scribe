@@ -120,7 +120,7 @@ def local_to_remote_links(
         note_text = note_text.replace(search_text, replace_text)
 
     # Same replacement logic for raw images
-    for text, local_link, remote_path in to_replace:
+    for _text, local_link, remote_path in to_replace:
         note_text = sub(
             f"<img(.*?)src=[\"']{re_escape(local_link)}[\"'](.*?)/?>",
             f'<img\\1src="{re_escape(remote_path)}"\\2/>',

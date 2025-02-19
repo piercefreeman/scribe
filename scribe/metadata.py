@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from dateutil import parser as date_parser
-from pydantic import BaseModel, ConfigDict, validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from scribe.asset import Asset
 
@@ -76,15 +76,15 @@ class CompileAsset(BaseModel):
     asset: Optional[Asset] = None
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    @validator("type", pre=True)
-    def validate_type(cls, type_value):
+    @field_validator("type", mode="before")
+    def validate_type(self, type_value):
         if isinstance(type_value, CompileAssetType):
             return type_value
 
         try:
             return CompileAssetType(type_value)
-        except ValueError:
-            raise ValueError(f"Unknown compile asset type: `{type_value}`")
+        except ValueError as e:
+            raise ValueError(f"Unknown compile asset type: `{type_value}`") from e
 
     @classmethod
     def _get_output_extension(cls, type: CompileAssetType) -> str:
@@ -109,7 +109,7 @@ class CompileAsset(BaseModel):
         try:
             asset_type = CompileAssetType.from_extension(path_obj.suffix)
         except ValueError as e:
-            raise ValueError(f"Could not determine asset type for path {path}: {str(e)}")
+            raise ValueError(f"Could not determine asset type for path {path}: {str(e)}") from e
 
         # Replace the extension for the output path
         output_extension = cls._get_output_extension(asset_type)
@@ -157,14 +157,14 @@ class NoteMetadata(BaseModel):
     featured_photos: list[str | FeaturedPhotoPayload] = []
     compile: list[CompileAsset] = []
 
-    @validator("date", pre=True)
-    def validate_date(cls, date):
+    @field_validator("date", mode="before")
+    def validate_date(self, date):
         if isinstance(date, datetime):
             return date
         return date_parser.parse(date)
 
-    @validator("status", pre=True)
-    def validate_status(cls, status):
+    @field_validator("status", mode="before")
+    def validate_status(self, status):
         if isinstance(status, NoteStatus):
             return status
 
@@ -175,8 +175,8 @@ class NoteMetadata(BaseModel):
         else:
             raise ValueError(f"Unknown status: `{status}`")
 
-    @validator("compile", pre=True)
-    def validate_compile(cls, compile_assets):
+    @field_validator("compile", mode="before")
+    def validate_compile(self, compile_assets):
         if not compile_assets:
             return []
 

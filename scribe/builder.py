@@ -22,7 +22,7 @@ from scribe.links import local_to_remote_links
 from scribe.metadata import BuildMetadata, FeaturedPhotoPosition, NoteStatus
 from scribe.models import PageDefinition, PageDirection, TemplateArguments
 from scribe.note import Asset, Note
-from scribe.parsers import InvalidMetadataException
+from scribe.parsers import InvalidMetadataError
 from scribe.snapshot import SnapshotMetadata, get_url_hash
 from scribe.template_utilities import filter_tag, group_by_month
 
@@ -99,12 +99,12 @@ class WebsiteBuilder:
                     # Save the processed note with the modified HTML
                     note.html_content = html_content
                     processed_notes.append(note)
-                except InvalidMetadataException as e:
+                except InvalidMetadataError as e:
                     console.print(f"[red]Invalid metadata in {note.path}:[/red] {str(e)}")
                     exit(1)
                 except Exception as e:
                     console.print(f"[red]Error processing {note.path}:[/red] {str(e)}")
-                    raise HandledBuildError()
+                    raise HandledBuildError() from e
 
             # Sort notes by date
             processed_notes = sorted(processed_notes, key=lambda x: x.metadata.date, reverse=True)
@@ -154,7 +154,7 @@ class WebsiteBuilder:
 
         except Exception as e:
             console.print(f"[red]Build failed:[/red] {str(e)}")
-            raise HandledBuildError()
+            raise HandledBuildError() from e
 
     def build_notes(self, notes: list[Note], output_path: Path, build_metadata: BuildMetadata):
         # When developing locally it's nice to preview draft notes on the homepage as they will look live
@@ -366,7 +366,7 @@ class WebsiteBuilder:
                                 folders[parent_path] = tree.add(f"/{parent_path}")
                             folders[parent_path].add(f"[blue]→[/blue] {note.title}")
 
-                except InvalidMetadataException as e:
+                except InvalidMetadataError as e:
                     console.print(f"[red]Invalid metadata: {path}: {e}[/red]")
                     found_error = True
 

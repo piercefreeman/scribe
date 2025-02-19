@@ -10,25 +10,25 @@ from yaml import safe_load as yaml_loads
 from scribe.metadata import NoteMetadata
 
 
-class InvalidMetadataException(Exception):
+class InvalidMetadataError(Exception):
     """Base exception for metadata validation failures."""
 
     pass
 
 
-class NoTitleException(InvalidMetadataException):
+class NoTitleError(InvalidMetadataError):
     """Raised when a note has no title (# header) specified."""
 
     pass
 
 
-class MissingMetadataBlockException(InvalidMetadataException):
+class MissingMetadataBlockError(InvalidMetadataError):
     """Raised when a note is missing the metadata block entirely."""
 
     pass
 
 
-class InvalidMetadataFormatException(InvalidMetadataException):
+class InvalidMetadataFormatError(InvalidMetadataError):
     """Raised when metadata format/content is invalid."""
 
     pass
@@ -64,7 +64,7 @@ def parse_title(text: str) -> ParsedText:
     headers = findall(r"(#+)(.*)", first_line)
     headers = sorted(headers, key=lambda x: len(x[0]))
     if not headers:
-        raise NoTitleException("No title (# header) specified.")
+        raise NoTitleError("No title (# header) specified.")
     return ParsedText(result=headers[0][1].strip(), parsed_lines=[0])
 
 
@@ -85,12 +85,12 @@ def parse_metadata(text: str) -> ParsedMetadata:
 
     if not metadata_string:
         # If users haven't specified metadata block at all, this is an error
-        raise MissingMetadataBlockException("No metadata block ('meta:') found in the file.")
+        raise MissingMetadataBlockError("No metadata block ('meta:') found in the file.")
 
     try:
-        metadata = NoteMetadata.parse_obj(yaml_loads(metadata_string)["meta"])
+        metadata = NoteMetadata.model_validate(yaml_loads(metadata_string)["meta"])
     except ValidationError as e:
-        raise InvalidMetadataFormatException(str(e))
+        raise InvalidMetadataFormatError(str(e)) from e
 
     return ParsedMetadata(result=metadata, parsed_lines=parsed_lines)
 

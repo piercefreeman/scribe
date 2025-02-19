@@ -14,11 +14,12 @@ from markdown.extensions.tables import TableExtension
 
 from scribe.asset import Asset
 from scribe.backup import backup_file
+from scribe.constants import READING_WPM
 from scribe.metadata import FeaturedPhotoPayload, NoteMetadata
 from scribe.parsers import (
-    InvalidMetadataFormatException,
-    MissingMetadataBlockException,
-    NoTitleException,
+    InvalidMetadataFormatError,
+    MissingMetadataBlockError,
+    NoTitleError,
     get_raw_text,
     get_simple_content,
     parse_metadata,
@@ -81,7 +82,7 @@ class Note:
                 path=path,
                 text=text,
             )
-        except NoTitleException:
+        except NoTitleError:
             # Backup the original file
             backup_path = backup_file(path)
             warning(f"Backed up original file to {backup_path}")
@@ -99,16 +100,14 @@ class Note:
                 path=path,
                 text=new_text,
             )
-        except MissingMetadataBlockException:
+        except MissingMetadataBlockError:
             # Backup the original file
             backup_path = backup_file(path)
             warning(f"Backed up original file to {backup_path}")
 
             # Add a stub metadata block after the title
             lines = text.split("\n")
-            first_line = lines[
-                0
-            ]  # Title should be here since NoTitleException would have caught it
+            first_line = lines[0]  # Title should be here since NoTitleError would have caught it
             rest_of_file = "\n".join(lines[1:])
 
             stub_metadata = f"""
@@ -127,9 +126,9 @@ meta:
                 path=path,
                 text=new_text,
             )
-        except InvalidMetadataFormatException as e:
+        except InvalidMetadataFormatError as e:
             # Re-raise with more context about which file failed
-            raise InvalidMetadataFormatException(f"Invalid metadata in {path}: {str(e)}")
+            raise InvalidMetadataFormatError(f"Invalid metadata in {path}: {str(e)}") from e
 
     @classmethod
     def from_text(cls, path: Path | str, text: str):
@@ -266,10 +265,8 @@ meta:
 
     @property
     def read_time_minutes(self):
-        # https://www.sciencedirect.com/science/article/abs/pii/S0749596X19300786
-        WPM = 238
         words = len(self.text.split())
-        return (words // WPM) + 1
+        return (words // READING_WPM) + 1
 
     @property
     def visible_tag(self):

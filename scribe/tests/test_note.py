@@ -65,9 +65,7 @@ def test_published():
 def test_auto_fix_missing_title(tmp_path):
     """Test that a file with no title gets auto-fixed with a stub title."""
     test_file = tmp_path / "test.md"
-    content = """Some content without a title
-    
-    This should get a title added."""
+    content = "Some content without a title\n\nThis should get a title added."
 
     test_file.write_text(content)
 
@@ -95,10 +93,9 @@ def test_auto_fix_missing_title(tmp_path):
 def test_auto_fix_missing_metadata(tmp_path):
     """Test that a file with title but no metadata gets auto-fixed with stub metadata."""
     test_file = tmp_path / "test.md"
-    content = """# Existing Title
-    
-    Some content without metadata block.
-    This should get metadata added."""
+    content = (
+        "# Existing Title\n\nSome content without metadata block.\nThis should get metadata added."
+    )
 
     test_file.write_text(content)
 
