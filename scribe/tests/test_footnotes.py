@@ -15,7 +15,7 @@ def test_find_references():
     text = create_test_note(
         header="Test References",
         body="""Here is a[^1] footnote and here is[^2] another one.
-And here's [^10] a bigger number."""
+And here's [^10] a bigger number.""",
     )
     refs = FootnoteParser.find_references(text)
     assert len(refs) == 3
@@ -31,7 +31,7 @@ def test_find_definitions():
         body="""[^1]: First footnote
 [^2]: Second footnote
 with multiple lines
-[^10]: Bigger number footnote"""
+[^10]: Bigger number footnote""",
     )
     defs = FootnoteParser.find_definitions(text)
     assert len(defs) == 3
@@ -60,7 +60,7 @@ def test_reorder_complex():
 
 [^1]: Third note
 [^2]: Second note
-[^10]: First note"""
+[^10]: First note""",
     )
     expected = create_test_note(
         header="Test Complex",
@@ -68,7 +68,7 @@ def test_reorder_complex():
 
 [^1]: First note
 [^2]: Second note
-[^3]: Third note"""
+[^3]: Third note""",
     )
     assert FootnoteParser.reorder(text) == expected
 
@@ -81,7 +81,7 @@ def test_reorder_with_multiline_definitions():
 
 [^2]: This is a multi-line
 footnote definition
-[^1]: Single line definition"""
+[^1]: Single line definition""",
     )
     expected = create_test_note(
         header="Test Multiline",
@@ -89,25 +89,21 @@ footnote definition
 
 [^1]: This is a multi-line
 footnote definition
-[^2]: Single line definition"""
+[^2]: Single line definition""",
     )
     assert FootnoteParser.reorder(text) == expected
 
 
 def test_no_footnotes():
     """Test handling of text without footnotes."""
-    text = create_test_note(
-        header="No Footnotes",
-        body="This text has no footnotes"
-    )
+    text = create_test_note(header="No Footnotes", body="This text has no footnotes")
     assert FootnoteParser.reorder(text) == text
 
 
 def test_references_without_definitions():
     """Test handling of text with references but no definitions."""
     text = create_test_note(
-        header="Missing Definitions",
-        body="This has a[^1] reference but no definition"
+        header="Missing Definitions", body="This has a[^1] reference but no definition"
     )
     assert FootnoteParser.reorder(text) == text
 
@@ -118,7 +114,7 @@ def test_definitions_without_references():
         header="Missing References",
         body="""Just some text
 
-[^1]: A definition without reference"""
+[^1]: A definition without reference""",
     )
     assert FootnoteParser.reorder(text) == text
 
@@ -130,14 +126,14 @@ def test_reorder_definitions_order():
         body="""Here is a[^2] footnote and here is[^1] another one.
 
 [^2]: Second footnote
-[^1]: First footnote"""
+[^1]: First footnote""",
     )
     expected = create_test_note(
         header="Test Reordering",
         body="""Here is a[^1] footnote and here is[^2] another one.
 
 [^1]: Second footnote
-[^2]: First footnote"""
+[^2]: First footnote""",
     )
     assert FootnoteParser.reorder(text) == expected
 
@@ -148,7 +144,7 @@ def test_reorder_definitions_order():
 
 [^5]: Third note
 [^10]: First note
-[^2]: Second note"""
+[^2]: Second note""",
     )
     expected = create_test_note(
         header="Test Non-sequential",
@@ -156,6 +152,6 @@ def test_reorder_definitions_order():
 
 [^1]: First note
 [^2]: Second note
-[^3]: Third note"""
+[^3]: Third note""",
     )
     assert FootnoteParser.reorder(text) == expected

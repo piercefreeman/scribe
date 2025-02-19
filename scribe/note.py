@@ -96,10 +96,7 @@ class Note:
                 f.write(new_text)
 
             warning(f"Added stub title to {path}")
-            return cls.from_text(
-                path=path,
-                text=new_text,
-            )
+            return cls.from_file(path)
         except MissingMetadataBlockError:
             # Backup the original file
             backup_path = backup_file(path)
@@ -113,7 +110,7 @@ class Note:
             stub_metadata = f"""
 meta:
     date: {datetime.now().strftime("%B %-d, %Y")}
-    status: draft
+    status: scratch
 """
             new_text = f"{first_line}\n{stub_metadata}\n{rest_of_file}"
 

@@ -164,6 +164,8 @@ class NoteMetadata(BaseModel):
             return NoteStatus.DRAFT
         elif status == "publish":
             return NoteStatus.PUBLISHED
+        elif status == "scratch":
+            return NoteStatus.SCRATCH
         else:
             raise ValueError(f"Unknown status: `{status}`")
 

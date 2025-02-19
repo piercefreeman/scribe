@@ -5,8 +5,7 @@ from scribe.tests.common import create_test_note
 
 def test_local_link(note_directory):
     text = create_test_note(
-        header="Header",
-        body="this is a [local path](./Local.md) other phrase ()"
+        header="Header", body="this is a [local path](./Local.md) other phrase ()"
     )
 
     local_mapping = {"Local": "remote-path"}
@@ -19,8 +18,7 @@ def test_local_link(note_directory):
 
 def test_remote_link_http(note_directory):
     text = create_test_note(
-        header="Header",
-        body="this is a [remote path](http://google.com) other phrase ()"
+        header="Header", body="this is a [remote path](http://google.com) other phrase ()"
     )
     local_mapping = {}
 
@@ -32,8 +30,7 @@ def test_remote_link_http(note_directory):
 
 def test_remote_link_www(note_directory):
     text = create_test_note(
-        header="Header",
-        body="this is a [remote path](www.google.com) other phrase ()"
+        header="Header", body="this is a [remote path](www.google.com) other phrase ()"
     )
     local_mapping = {}
 

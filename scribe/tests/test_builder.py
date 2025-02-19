@@ -1,49 +1,63 @@
 from pathlib import Path
 
+import pytest
+
 from scribe.builder import WebsiteBuilder
 from scribe.metadata import BuildMetadata, NoteStatus
 from scribe.models import TemplateArguments
 from scribe.note import Note
 from scribe.tests.common import create_test_note
-import pytest
+
 
 @pytest.fixture
-def scratch_note() -> str:
-    return create_test_note(
+def scratch_note(tmp_path: Path) -> Note:
+    content = create_test_note(
         header="Scratch Note",
         body="This is a scratch note.",
-        meta={
-            "date": "September 27, 2022",
-            "status": "scratch"
-        }
+        meta={"date": "September 27, 2022", "status": "SCRATCH"},
     )
+    note_path = tmp_path / "scratch_note.md"
+    note_path.write_text(content)
+    return Note.from_file(note_path)
+
 
 @pytest.fixture
-def draft_note() -> str:
-    return create_test_note(
+def draft_note(tmp_path: Path) -> Note:
+    content = create_test_note(
         header="Draft Note",
         body="This is a draft note.",
-        meta={
-            "date": "September 27, 2022",
-            "status": "draft"
-        }
+        meta={"date": "September 27, 2022", "status": "draft"},
     )
+    note_path = tmp_path / "draft_note.md"
+    note_path.write_text(content)
+    return Note.from_file(note_path)
 
 
-def test_exclude_scratch(builder: WebsiteBuilder, note_directory: Path, scratch_note: Note, draft_note: Note):
+def test_exclude_scratch(builder: WebsiteBuilder, note_directory: Path):
     """
     Test that excluded notes are not published
     """
-    (note_directory / "scratch_note.md").write_text(scratch_note)
-    (note_directory / "draft_note.md").write_text(draft_note)
+    (note_directory / "scratch_note.md").write_text(
+        create_test_note(
+            header="Scratch Note",
+            body="This is a scratch note.",
+            meta={"date": "September 27, 2022", "status": "scratch"},
+        )
+    )
+    (note_directory / "draft_note.md").write_text(
+        create_test_note(
+            header="Draft Note",
+            body="This is a draft note.",
+            meta={"date": "September 27, 2022", "status": "draft"},
+        )
+    )
 
     notes = builder.get_notes(note_directory)
     assert len(notes) == 1
-
     assert notes[0].metadata.status == NoteStatus.DRAFT
 
 
-def test_skip_hidden_directories(builder: WebsiteBuilder, note_directory: Path, draft_note: Note):
+def test_skip_hidden_directories(builder: WebsiteBuilder, note_directory: Path):
     """
     Test that files in hidden directories (starting with .) are skipped
     """
@@ -52,10 +66,22 @@ def test_skip_hidden_directories(builder: WebsiteBuilder, note_directory: Path, 
     hidden_dir.mkdir()
 
     # Create a note in the hidden directory
-    (hidden_dir / "hidden_note.md").write_text(draft_note)
+    (hidden_dir / "hidden_note.md").write_text(
+        create_test_note(
+            header="Draft Note",
+            body="This is a draft note.",
+            meta={"date": "September 27, 2022", "status": "draft"},
+        )
+    )
 
     # Create a note in the main directory
-    (note_directory / "visible_note.md").write_text(draft_note)
+    (note_directory / "visible_note.md").write_text(
+        create_test_note(
+            header="Draft Note",
+            body="This is a draft note.",
+            meta={"date": "September 27, 2022", "status": "draft"},
+        )
+    )
 
     notes = builder.get_notes(note_directory)
     assert len(notes) == 1
