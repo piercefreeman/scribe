@@ -4,7 +4,7 @@ from hashlib import sha256
 from os import getenv
 from pathlib import Path
 from random import sample
-from shutil import copyfile, copytree
+from shutil import copy2, copyfile
 from sys import exit, maxsize
 from typing import Set
 
@@ -23,7 +23,7 @@ from scribe.metadata import BuildMetadata, FeaturedPhotoPosition, NoteStatus
 from scribe.models import PageDefinition, PageDirection, TemplateArguments
 from scribe.note import Asset, Note
 from scribe.parsers import InvalidMetadataException
-from scribe.snapshot import get_url_hash, SnapshotMetadata
+from scribe.snapshot import SnapshotMetadata, get_url_hash
 from scribe.template_utilities import filter_tag, group_by_month
 
 console = Console()
@@ -431,14 +431,14 @@ class WebsiteBuilder:
 
             snapshot_id = get_url_hash(href)
             snapshot_dir = snapshots_dir / snapshot_id
-            
+
             if snapshot_dir.exists():
                 # Load metadata
                 metadata_file = snapshot_dir / "metadata.json"
                 if metadata_file.exists():
                     try:
                         metadata = SnapshotMetadata.from_file(metadata_file)
-                        
+
                         # Add snapshot-id and metadata attributes to the link
                         link["snapshot-id"] = snapshot_id
                         for key, value in metadata.to_link_attributes().items():
@@ -448,12 +448,14 @@ class WebsiteBuilder:
                         source_html = snapshot_dir / "snapshot.html"
                         target_dir = snapshot_output_dir / snapshot_id
                         target_html = target_dir / "snapshot.html"
-                        
+
                         if source_html.exists() and not target_html.exists():
                             target_dir.mkdir(exist_ok=True)
-                            shutil.copy2(source_html, target_html)
+                            copy2(source_html, target_html)
                             console.print(f"[green]Copied snapshot for {href}[/green]")
                     except Exception as e:
-                        console.print(f"[red]Error processing snapshot metadata for {href}: {str(e)}[/red]")
+                        console.print(
+                            f"[red]Error processing snapshot metadata for {href}: {str(e)}[/red]"
+                        )
 
         return str(soup)

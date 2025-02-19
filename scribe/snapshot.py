@@ -1,11 +1,11 @@
 import json
 from asyncio import Semaphore, create_task, gather
+from dataclasses import dataclass
 from datetime import datetime
 from hashlib import md5
 from pathlib import Path
 from re import finditer, sub
 from typing import Set
-from dataclasses import dataclass
 
 from rich.console import Console
 
@@ -13,11 +13,13 @@ from scribe.note import Note
 
 console = Console()
 
+
 @dataclass
 class SnapshotMetadata:
     """
     Metadata for a webpage snapshot.
     """
+
     crawled_date: datetime
     original_url: str
 
@@ -29,7 +31,7 @@ class SnapshotMetadata:
         data = json.loads(path.read_text())
         return cls(
             crawled_date=datetime.fromisoformat(data["crawled_date"]),
-            original_url=data["original_url"]
+            original_url=data["original_url"],
         )
 
     def to_link_attributes(self) -> dict[str, str]:
@@ -98,8 +100,11 @@ async def snapshot_url(
     url_hash = get_url_hash(url)
     output_path = output_dir / url_hash
 
-    if output_path.exists():
-        console.print(f"[blue]Skipping {url}, already snapshotted[/blue]")
+    # Until we have a valid metadata file, we consider the URL as not snapshotted. This lets
+    # us try failed requests again.
+    if (output_path / "metadata.json").exists():
+        console.print(f"[blue]Skipping {url} - already snapshotted[/blue]")
+        console.print(f" - Metadata: {output_path / 'metadata.json'}")
         return
 
     async with semaphore:
