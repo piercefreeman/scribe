@@ -30,4 +30,4 @@ jobs:
 
       - name: Run MyPy for type checking
         run: |
-          uv run mypy scribe
+          make lint-ci
