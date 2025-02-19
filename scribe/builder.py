@@ -166,6 +166,12 @@ class WebsiteBuilder:
                 note for note in notes if note.metadata.status == NoteStatus.PUBLISHED
             ]
 
+        # Pre-build the notes directory
+        notes_path = output_path / "notes"
+        notes_path.mkdir(exist_ok=True)
+        assets_path = output_path / "images"
+        assets_path.mkdir(exist_ok=True)
+
         # For each tag, sample related posts (up to 3 total)
         notes_by_tag = defaultdict(list)
         for note in published_notes:
@@ -176,7 +182,7 @@ class WebsiteBuilder:
         post_template_paths = ["post.html", "post-travel.html"]
         post_templates = {path: self.env.get_template(path) for path in post_template_paths}
         for note in notes:
-            output_file = output_path / "notes" / f"{note.webpage_path}.html"
+            output_file = notes_path / f"{note.webpage_path}.html"
 
             # Skip if already built and source hasn't changed
             if not note.path:
