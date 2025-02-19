@@ -24,6 +24,13 @@ def backup_file(file_path: Path) -> Path:
     backup_filename = f"{file_path.stem}_{timestamp}{file_path.suffix}"
     backup_path = backup_dir / backup_filename
 
+    # If there are already matching files with this prefix, add a number to the end
+    counter = 1
+    while backup_path.exists():
+        backup_filename = f"{file_path.stem}_{timestamp}_{counter}{file_path.suffix}"
+        backup_path = backup_dir / backup_filename
+        counter += 1
+
     # Copy the file
     copy2(file_path, backup_path)
     return backup_path

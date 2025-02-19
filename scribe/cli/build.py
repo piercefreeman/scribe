@@ -15,15 +15,6 @@ from scribe.builder import WebsiteBuilder
 from scribe.io import get_asset_path
 
 
-def build(notes_path: str, output_path: str):
-    secho("Building new output...", fg="yellow")
-
-    builder = WebsiteBuilder()
-    builder.build(notes_path, output_path)
-
-    secho("Website built", fg="green")
-
-
 @command()
 @option("--output", default="static")
 @option("--clean", is_flag=True, default=False)

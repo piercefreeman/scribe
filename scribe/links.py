@@ -77,11 +77,11 @@ def local_to_remote_links(
 
             error_text = Text()
             error_text.append("\nBroken link in ", style="red bold")
-            error_text.append(note.filename, style="yellow")
+            error_text.append(note.filename or "unknown", style="yellow")
             error_text.append("\nCannot find: ", style="red")
             error_text.append(match.group(0), style="yellow")
             error_text.append("\nFull path: ", style="red")
-            error_text.append(str(note.path), style="yellow")
+            error_text.append(str(note.path or "unknown"), style="yellow")
             console.print(error_text)
 
             if similar_files:
@@ -120,7 +120,7 @@ def local_to_remote_links(
         note_text = note_text.replace(search_text, replace_text)
 
     # Same replacement logic for raw images
-    for text, local_link, remote_path in to_replace:
+    for _text, local_link, remote_path in to_replace:
         note_text = sub(
             f"<img(.*?)src=[\"']{re_escape(local_link)}[\"'](.*?)/?>",
             f'<img\\1src="{re_escape(remote_path)}"\\2/>',

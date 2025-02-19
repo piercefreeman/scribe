@@ -8,7 +8,7 @@ jobs:
 
     strategy:
       matrix:
-        python: ["3.10", "3.11"]
+        python: ["3.12"]
 
     steps:
     - name: Checkout repository
@@ -18,20 +18,15 @@ jobs:
       with:
         python-version: ${{ matrix.python }}
 
-    - name: Install Poetry
+    - name: Install uv
       run: |
-        curl -sSL https://install.python-poetry.org | python3 -
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-    - name: Configure Poetry
+    - name: Install dependencies
       run: |
-        echo "$(python -c 'import os,sys; print(os.path.realpath(sys.executable))')/$(echo $(python -c 'import sys; print(sys.executable)') | rev | cut -d'/' -f1 | rev)" > "$(python -c 'import site; print(site.USER_BASE)')/bin/python"
-        echo "PATH=$(python -c 'import site; print(site.USER_BASE)')/bin:$PATH" >> $GITHUB_ENV
-
-    - name: Install dependencies with Poetry
-      run: |
-        poetry config virtualenvs.create false
-        poetry install
+        uv sync
 
     - name: Run pytest
       run: |
-        poetry run pytest scribe
+        uv run pytest scribe

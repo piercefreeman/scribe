@@ -3,6 +3,7 @@ from logging import warning
 from os import environ
 from pathlib import Path
 from re import sub
+from typing import Optional
 
 from bs4 import BeautifulSoup
 from markdown import markdown
@@ -13,11 +14,12 @@ from markdown.extensions.tables import TableExtension
 
 from scribe.asset import Asset
 from scribe.backup import backup_file
+from scribe.constants import READING_WPM
 from scribe.metadata import FeaturedPhotoPayload, NoteMetadata
 from scribe.parsers import (
-    InvalidMetadataFormatException,
-    MissingMetadataBlockException,
-    NoTitleException,
+    InvalidMetadataFormatError,
+    MissingMetadataBlockError,
+    NoTitleError,
     get_raw_text,
     get_simple_content,
     parse_metadata,
@@ -42,22 +44,33 @@ class Note:
 
     filename: str | None = None
     path: Path | None = None
+    _html_content: Optional[str] = None
 
     def __init__(
         self,
         text: str,
         title: str,
-        metadata: NoteMetadata,
         simple_content: str,
+        metadata: NoteMetadata,
         filename: str | None = None,
-        path: str | Path | None = None,
+        path: Optional[Path | str] = None,
     ):
         self.text = text
         self.title = title
-        self.metadata = metadata
         self.simple_content = simple_content
+        self.metadata = metadata
         self.filename = filename
         self.path = Path(path) if path else None
+
+    @property
+    def html_content(self) -> Optional[str]:
+        """Get the cached HTML content if it exists."""
+        return self._html_content
+
+    @html_content.setter
+    def html_content(self, content: str) -> None:
+        """Set the cached HTML content."""
+        self._html_content = content
 
     @classmethod
     def from_file(cls, path: Path):
@@ -69,7 +82,7 @@ class Note:
                 path=path,
                 text=text,
             )
-        except NoTitleException:
+        except NoTitleError:
             # Backup the original file
             backup_path = backup_file(path)
             warning(f"Backed up original file to {backup_path}")
@@ -83,26 +96,21 @@ class Note:
                 f.write(new_text)
 
             warning(f"Added stub title to {path}")
-            return cls.from_text(
-                path=path,
-                text=new_text,
-            )
-        except MissingMetadataBlockException:
+            return cls.from_file(path)
+        except MissingMetadataBlockError:
             # Backup the original file
             backup_path = backup_file(path)
             warning(f"Backed up original file to {backup_path}")
 
             # Add a stub metadata block after the title
             lines = text.split("\n")
-            first_line = lines[
-                0
-            ]  # Title should be here since NoTitleException would have caught it
+            first_line = lines[0]  # Title should be here since NoTitleError would have caught it
             rest_of_file = "\n".join(lines[1:])
 
             stub_metadata = f"""
 meta:
     date: {datetime.now().strftime("%B %-d, %Y")}
-    status: draft
+    status: scratch
 """
             new_text = f"{first_line}\n{stub_metadata}\n{rest_of_file}"
 
@@ -115,9 +123,9 @@ meta:
                 path=path,
                 text=new_text,
             )
-        except InvalidMetadataFormatException as e:
+        except InvalidMetadataFormatError as e:
             # Re-raise with more context about which file failed
-            raise InvalidMetadataFormatException(f"Invalid metadata in {path}: {str(e)}")
+            raise InvalidMetadataFormatError(f"Invalid metadata in {path}: {str(e)}") from e
 
     @classmethod
     def from_text(cls, path: Path | str, text: str):
@@ -209,7 +217,14 @@ meta:
         header_tokens = header.split()[:20]
         return "-".join(header_tokens)
 
-    def get_html(self):
+    def get_html(self) -> str:
+        """
+        Get the HTML content for this note. If we've already processed it during build,
+        return the cached version, otherwise generate it.
+        """
+        if self._html_content is not None:
+            return self._html_content
+
         html = markdown(
             self.text,
             extensions=[
@@ -226,7 +241,6 @@ meta:
         # tag - so tailwind can pick up on them)
         for img in content.find_all("img"):
             image_classes = img.get("class", [])
-            image_classes.append("rounded-lg shadow-lg border-4 border-white dark:border-slate-600")
 
             # Travel specific styling
             if "travel" in self.metadata.tags:
@@ -236,7 +250,8 @@ meta:
 
             img["class"] = " ".join(image_classes)
 
-        return str(content)
+        self._html_content = str(content)
+        return self._html_content
 
     def has_footnotes(self):
         # Find footnote definitions in the text
@@ -247,10 +262,8 @@ meta:
 
     @property
     def read_time_minutes(self):
-        # https://www.sciencedirect.com/science/article/abs/pii/S0749596X19300786
-        WPM = 238
         words = len(self.text.split())
-        return (words // WPM) + 1
+        return (words // READING_WPM) + 1
 
     @property
     def visible_tag(self):

@@ -19,19 +19,15 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Install poetry
-        run:
-          curl -sSL https://install.python-poetry.org | python3 -
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install python dependencies
         run: |
-          export PATH="/Users/runner/.local/bin:$PATH"
-          poetry install
-
-      - name: Check Python formatting with Black
-        run: |
-          poetry run black --check scribe
+          uv sync
 
       - name: Run MyPy for type checking
         run: |
-          poetry run mypy scribe
+          make lint-ci
