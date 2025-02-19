@@ -3,6 +3,7 @@ from logging import warning
 from os import environ
 from pathlib import Path
 from re import sub
+from typing import Optional
 
 from bs4 import BeautifulSoup
 from markdown import markdown
@@ -42,22 +43,33 @@ class Note:
 
     filename: str | None = None
     path: Path | None = None
+    _html_content: Optional[str] = None
 
     def __init__(
         self,
         text: str,
         title: str,
-        metadata: NoteMetadata,
         simple_content: str,
+        metadata: NoteMetadata,
         filename: str | None = None,
-        path: str | Path | None = None,
+        path: Optional[Path | str] = None,
     ):
         self.text = text
         self.title = title
-        self.metadata = metadata
         self.simple_content = simple_content
+        self.metadata = metadata
         self.filename = filename
         self.path = Path(path) if path else None
+
+    @property
+    def html_content(self) -> Optional[str]:
+        """Get the cached HTML content if it exists."""
+        return self._html_content
+
+    @html_content.setter
+    def html_content(self, content: str) -> None:
+        """Set the cached HTML content."""
+        self._html_content = content
 
     @classmethod
     def from_file(cls, path: Path):
@@ -209,7 +221,14 @@ meta:
         header_tokens = header.split()[:20]
         return "-".join(header_tokens)
 
-    def get_html(self):
+    def get_html(self) -> str:
+        """
+        Get the HTML content for this note. If we've already processed it during build,
+        return the cached version, otherwise generate it.
+        """
+        if self._html_content is not None:
+            return self._html_content
+
         html = markdown(
             self.text,
             extensions=[
@@ -236,7 +255,8 @@ meta:
 
             img["class"] = " ".join(image_classes)
 
-        return str(content)
+        self._html_content = str(content)
+        return self._html_content
 
     def has_footnotes(self):
         # Find footnote definitions in the text

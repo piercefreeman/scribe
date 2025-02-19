@@ -5,12 +5,41 @@ from hashlib import md5
 from pathlib import Path
 from re import finditer, sub
 from typing import Set
+from dataclasses import dataclass
 
 from rich.console import Console
 
 from scribe.note import Note
 
 console = Console()
+
+@dataclass
+class SnapshotMetadata:
+    """
+    Metadata for a webpage snapshot.
+    """
+    crawled_date: datetime
+    original_url: str
+
+    @classmethod
+    def from_file(cls, path: Path) -> "SnapshotMetadata":
+        """
+        Load metadata from a JSON file.
+        """
+        data = json.loads(path.read_text())
+        return cls(
+            crawled_date=datetime.fromisoformat(data["crawled_date"]),
+            original_url=data["original_url"]
+        )
+
+    def to_link_attributes(self) -> dict[str, str]:
+        """
+        Convert metadata to HTML link attributes.
+        """
+        return {
+            "data-snapshot-date": self.crawled_date.isoformat(),
+            "data-snapshot-url": self.original_url,
+        }
 
 
 def extract_urls_from_note(note: Note) -> Set[str]:

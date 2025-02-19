@@ -4,10 +4,11 @@ from hashlib import sha256
 from os import getenv
 from pathlib import Path
 from random import sample
-from shutil import copyfile
+from shutil import copyfile, copytree
 from sys import exit, maxsize
 from typing import Set
 
+from bs4 import BeautifulSoup
 from click import secho
 from jinja2 import Environment, PackageLoader, select_autoescape
 from PIL import Image
@@ -22,6 +23,7 @@ from scribe.metadata import BuildMetadata, FeaturedPhotoPosition, NoteStatus
 from scribe.models import PageDefinition, PageDirection, TemplateArguments
 from scribe.note import Asset, Note
 from scribe.parsers import InvalidMetadataException
+from scribe.snapshot import get_url_hash, SnapshotMetadata
 from scribe.template_utilities import filter_tag, group_by_month
 
 console = Console()
@@ -60,56 +62,99 @@ class WebsiteBuilder:
         # Initialize build state
         self.build_state = BuildState()
 
-    def build(self, notes_path: str | Path, output_path: str | Path):
-        notes_path = Path(notes_path).expanduser()
-        output_path = Path(output_path).expanduser()
+    def build(self, notes_path: str | Path, output_path: str | Path) -> None:
+        """
+        Build the website from markdown notes.
 
-        output_path.mkdir(exist_ok=True)
-        (output_path / "notes").mkdir(exist_ok=True)
-        (output_path / "images").mkdir(exist_ok=True)
+        Args:
+            notes_path: Path to the notes directory
+            output_path: Path to the output directory
+        """
+        try:
+            notes_path = Path(notes_path).expanduser()
+            output_path = Path(output_path).expanduser()
+            snapshots_dir = notes_path / "snapshots"
 
-        all_notes = self.get_notes(notes_path)
+            output_path.mkdir(exist_ok=True)
 
-        # When developing locally it's nice to preview draft notes on the homepage as they will look live
-        # But require this as an explicit env variable
-        if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
-            published_notes = all_notes
-        else:
-            published_notes = [
-                note for note in all_notes if note.metadata.status == NoteStatus.PUBLISHED
-            ]
+            # Get all notes
+            notes = self.get_notes(notes_path)
+            if not notes:
+                secho("No notes found", fg="yellow")
+                return
 
-        build_metadata = BuildMetadata()
+            # Process each note
+            processed_notes = []
+            for note in notes:
+                try:
+                    # Generate HTML content
+                    html_content = note.get_html()
 
-        # The static build phase will inject the stylesheet hashes that will be used
-        # for cache invalidation in subsequent pages
-        console.print("[blue]Building static assets[/blue]")
-        self.build_static(output_path, build_metadata)
+                    # Process snapshots if they exist
+                    if snapshots_dir.exists():
+                        html_content = self.process_snapshots(
+                            html_content, snapshots_dir, output_path
+                        )
 
-        # Build all notes that are either in draft form or published. Draft notes require a unique
-        # URL to access them but should be displayed publically
-        console.print("[blue]Building notes[/blue]")
-        self.build_notes(all_notes, output_path, build_metadata)
+                    # Save the processed note with the modified HTML
+                    note.html_content = html_content
+                    processed_notes.append(note)
+                except InvalidMetadataException as e:
+                    console.print(f"[red]Invalid metadata in {note.path}:[/red] {str(e)}")
+                    exit(1)
+                except Exception as e:
+                    console.print(f"[red]Error processing {note.path}:[/red] {str(e)}")
+                    raise HandledBuildError()
 
-        console.print("[blue]Building pages[/blue]")
-        self.build_pages(
-            [
-                PageDefinition("home.html", "index.html", TemplateArguments(notes=published_notes)),
-                PageDefinition("rss.xml", "rss.xml", TemplateArguments(notes=published_notes)),
-                PageDefinition(
-                    "travel.html",
-                    "travel.html",
-                    TemplateArguments(notes=filter_tag(published_notes, "travel")),
-                ),
-                PageDefinition(
-                    "projects.html",
-                    "projects.html",
-                ),
-                PageDefinition("about.html", "about.html"),
-            ],
-            output_path,
-            build_metadata,
-        )
+            # Sort notes by date
+            processed_notes = sorted(processed_notes, key=lambda x: x.metadata.date, reverse=True)
+
+            # When developing locally it's nice to preview draft notes on the homepage as they will look live
+            # But require this as an explicit env variable
+            if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
+                published_notes = processed_notes
+            else:
+                published_notes = [
+                    note for note in processed_notes if note.metadata.status == NoteStatus.PUBLISHED
+                ]
+
+            build_metadata = BuildMetadata()
+
+            # The static build phase will inject the stylesheet hashes that will be used
+            # for cache invalidation in subsequent pages
+            console.print("[blue]Building static assets[/blue]")
+            self.build_static(output_path, build_metadata)
+
+            # Build all notes that are either in draft form or published. Draft notes require a unique
+            # URL to access them but should be displayed publically
+            console.print("[blue]Building notes[/blue]")
+            self.build_notes(processed_notes, output_path, build_metadata)
+
+            console.print("[blue]Building pages[/blue]")
+            self.build_pages(
+                [
+                    PageDefinition(
+                        "home.html", "index.html", TemplateArguments(notes=published_notes)
+                    ),
+                    PageDefinition("rss.xml", "rss.xml", TemplateArguments(notes=published_notes)),
+                    PageDefinition(
+                        "travel.html",
+                        "travel.html",
+                        TemplateArguments(notes=filter_tag(published_notes, "travel")),
+                    ),
+                    PageDefinition(
+                        "projects.html",
+                        "projects.html",
+                    ),
+                    PageDefinition("about.html", "about.html"),
+                ],
+                output_path,
+                build_metadata,
+            )
+
+        except Exception as e:
+            console.print(f"[red]Build failed:[/red] {str(e)}")
+            raise HandledBuildError()
 
     def build_notes(self, notes: list[Note], output_path: Path, build_metadata: BuildMetadata):
         # When developing locally it's nice to preview draft notes on the homepage as they will look live
@@ -356,3 +401,59 @@ class WebsiteBuilder:
 
         processed_notes = sorted(processed_notes, key=lambda x: x.metadata.date, reverse=True)
         return processed_notes
+
+    def process_snapshots(self, html_content: str, snapshots_dir: Path, output_dir: Path) -> str:
+        """
+        Process HTML content to:
+        1. Find all external links
+        2. Check if we have snapshots for them
+        3. Add snapshot-id and metadata attributes to links that have snapshots
+        4. Copy snapshot HTML files to the output directory
+
+        Args:
+            html_content: The HTML content to process
+            snapshots_dir: Directory containing snapshots
+            output_dir: Build output directory
+
+        Returns:
+            Modified HTML content with snapshot attributes added
+        """
+        soup = BeautifulSoup(html_content, "html.parser")
+        snapshot_output_dir = output_dir / "snapshots"
+        snapshot_output_dir.mkdir(exist_ok=True)
+
+        for link in soup.find_all("a", href=True):
+            href = link["href"]
+
+            # Skip relative links
+            if not any(href.startswith(prefix) for prefix in ["http://", "https://", "www."]):
+                continue
+
+            snapshot_id = get_url_hash(href)
+            snapshot_dir = snapshots_dir / snapshot_id
+            
+            if snapshot_dir.exists():
+                # Load metadata
+                metadata_file = snapshot_dir / "metadata.json"
+                if metadata_file.exists():
+                    try:
+                        metadata = SnapshotMetadata.from_file(metadata_file)
+                        
+                        # Add snapshot-id and metadata attributes to the link
+                        link["snapshot-id"] = snapshot_id
+                        for key, value in metadata.to_link_attributes().items():
+                            link[key] = value
+
+                        # Copy only the HTML snapshot if it hasn't been copied yet
+                        source_html = snapshot_dir / "snapshot.html"
+                        target_dir = snapshot_output_dir / snapshot_id
+                        target_html = target_dir / "snapshot.html"
+                        
+                        if source_html.exists() and not target_html.exists():
+                            target_dir.mkdir(exist_ok=True)
+                            shutil.copy2(source_html, target_html)
+                            console.print(f"[green]Copied snapshot for {href}[/green]")
+                    except Exception as e:
+                        console.print(f"[red]Error processing snapshot metadata for {href}: {str(e)}[/red]")
+
+        return str(soup)
