@@ -14,6 +14,8 @@ from scribe.note import Note
 
 console = Console()
 
+MAX_SNAPSHOT_SIZE = 45 * 1024 * 1024  # 45MB
+
 
 @dataclass
 class SnapshotMetadata:
@@ -26,6 +28,7 @@ class SnapshotMetadata:
     success: bool
     attempts: int
     last_error: str | None
+    too_large: bool = False
 
     @classmethod
     def from_file(cls, path: Path) -> "SnapshotMetadata":
@@ -39,6 +42,7 @@ class SnapshotMetadata:
             success=data.get("success", False),
             attempts=data.get("attempts", 0),
             last_error=data.get("last_error"),
+            too_large=data.get("too_large", False),
         )
 
     def to_link_attributes(self) -> dict[str, str]:
@@ -46,7 +50,7 @@ class SnapshotMetadata:
         Convert metadata to HTML link attributes.
         Only returns attributes if the snapshot was successful.
         """
-        if not self.success:
+        if not self.success and not self.too_large:
             return {}
 
         return {
@@ -64,6 +68,7 @@ class SnapshotMetadata:
             "success": self.success,
             "attempts": self.attempts,
             "last_error": self.last_error,
+            "too_large": self.too_large,
         }
 
 
@@ -133,6 +138,9 @@ async def snapshot_url(
         if metadata.success:
             console.print(f"[blue]Skipping {url} - already successfully snapshotted[/blue]")
             return
+        if metadata.too_large:
+            console.print(f"[yellow]Skipping {url} - page is too large[/yellow]")
+            return
         current_attempts = metadata.attempts
         if current_attempts >= max_attempts:
             console.print(f"[red]Skipping {url} - reached maximum attempts ({max_attempts})[/red]")
@@ -178,10 +186,22 @@ async def snapshot_url(
                 stdout, stderr = await wait_for(process.communicate(), timeout=75)
                 success = False
                 error_message = None
+                too_large = False
 
                 if process.returncode == 0 and snapshot_file.exists():
-                    success = True
-                    console.print(f"[green]Successfully snapshotted {url}[/green]")
+                    file_size = snapshot_file.stat().st_size
+                    if file_size > MAX_SNAPSHOT_SIZE:
+                        success = False
+                        too_large = True
+                        error_message = (
+                            f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds 45MB limit"
+                        )
+                        console.print(f"[yellow]Snapshot too large: {error_message}[/yellow]")
+                        # Delete the large file
+                        snapshot_file.unlink()
+                    else:
+                        success = True
+                        console.print(f"[green]Successfully snapshotted {url}[/green]")
                 else:
                     error_message = stderr.decode() or stdout.decode() or "Unknown error"
                     console.print(f"[red]Failed to snapshot {url}: {error_message}[/red]")
@@ -194,6 +214,7 @@ async def snapshot_url(
                 except Exception:
                     pass
                 success = False
+                too_large = False
 
             # Save metadata
             metadata = SnapshotMetadata(
@@ -202,6 +223,7 @@ async def snapshot_url(
                 success=success,
                 attempts=current_attempts + 1,
                 last_error=error_message if not success else None,
+                too_large=too_large,
             )
             metadata_file.write_text(json.dumps(metadata.to_dict(), indent=2))
 
@@ -216,6 +238,7 @@ async def snapshot_url(
                 success=False,
                 attempts=current_attempts + 1,
                 last_error=error_str,
+                too_large=False,
             )
             metadata_file.write_text(json.dumps(metadata.to_dict(), indent=2))
 
