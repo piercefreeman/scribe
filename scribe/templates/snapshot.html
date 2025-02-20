@@ -12,8 +12,8 @@
 <!-- Command Hint Template -->
 <template id="command-hint-template">
     <div class="fixed bottom-8 right-8 bg-gray-800 dark:bg-white/15 px-6 py-3 rounded-lg shadow-lg backdrop-blur-sm opacity-0 transition-opacity duration-200 flex items-center gap-3 z-10">
-        <kbd class="px-2.5 py-1.5 text-xs font-medium text-white dark:text-white/90 bg-gray-700 dark:bg-white/10 border border-gray-600 dark:border-white/20 rounded-md">
-        </kbd>
+        <span id="command-hint-key" class="px-2.5 py-1.5 text-xs font-medium text-white dark:text-white/90 bg-gray-700 dark:bg-white/10 border border-gray-600 dark:border-white/20 rounded-md">
+        </span>
         <span class="text-sm text-white dark:text-white/90">to Preview</span>
     </div>
 </template>
@@ -90,7 +90,7 @@
 
         // Create and add command hint to body
         const commandHint = template.content.cloneNode(true).firstElementChild;
-        commandHint.querySelector('kbd').textContent = `${modifierKey}+${shortcutKey}`;
+        commandHint.querySelector('#command-hint-key').textContent = `${modifierKey}+${shortcutKey}`;
         document.body.appendChild(commandHint);
 
         let activeLink = null;
