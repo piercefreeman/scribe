@@ -1,14 +1,12 @@
-from itertools import chain
 from pathlib import Path
 from re import escape as re_escape
-from re import finditer, sub
+from re import sub
 
 from rapidfuzz import process
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
 
-from scribe.exceptions import HandledBuildError
+from scribe.logging import LOGGER
+from scribe.markdown import MarkdownParser
 from scribe.note import Note
 
 console = Console()
@@ -25,26 +23,22 @@ def local_to_remote_links(
 
     :param path_to_remote: Specify the mapping from the local path (without path prefix)
         and the remote location of the file.
-
     """
+    LOGGER.info(f"Converting links for note: {note.title}")
     note_text = note.text
+    parser = MarkdownParser()
 
-    # Search for links that haven't been escaped with a \ prior to them
-    markdown_matches = finditer(r"[^\\]\[(.*?)\]\((.+?)\)", note_text)
-    img_matches = finditer(r"<(img).*?src=[\"'](.*?)[\"'].*?/?>", note_text)
-    matches = chain(markdown_matches, img_matches)
+    # Get all markdown links and HTML images
+    markdown_links = parser.find_markdown_links(note_text)
+    html_images = parser.find_html_images(note_text)
 
-    local_links = [
-        match
-        for match in matches
-        if not any(
-            [
-                "http://" in match.group(2),
-                "https://" in match.group(2),
-                "www." in match.group(2),
-            ]
-        )
-    ]
+    # Filter out external links
+    local_links = []
+    for text, url in markdown_links:
+        if not parser.is_external_url(url):
+            local_links.append((text, url))
+
+    LOGGER.info(f"Found local links: {[url for _, url in local_links]}")
 
     # Augment the remote path with links to our media files
     # We choose to use the preview images even if the local paths are pointed
@@ -60,54 +54,18 @@ def local_to_remote_links(
     # [(text, local link, remote link)]
     to_replace = []
 
-    # Swap the local links with their actual remote counterparts
-    for match in local_links:
-        text = match.group(1)
-        local_link = match.group(2)
+    for text, local_link in local_links:
+        # Remove any relative path indicators and file extension
+        clean_link = Path(local_link.lstrip("./")).with_suffix("").name
 
-        filename = Path(local_link).with_suffix("").name
-        if filename not in path_to_remote:
-            # Find similar filenames using fuzzy matching
-            similar_files = process.extract(
-                filename,
-                path_to_remote.keys(),
-                limit=5,
-                score_cutoff=50,  # Only show reasonably similar matches
-            )
-
-            error_text = Text()
-            error_text.append("\nBroken link in ", style="red bold")
-            error_text.append(note.filename or "unknown", style="yellow")
-            error_text.append("\nCannot find: ", style="red")
-            error_text.append(match.group(0), style="yellow")
-            error_text.append("\nFull path: ", style="red")
-            error_text.append(str(note.path or "unknown"), style="yellow")
-            console.print(error_text)
-
-            if similar_files:
-                suggestions = Panel(
-                    "\n".join(
-                        [
-                            "[yellow]Did you mean:[/yellow]",
-                            *[
-                                f"[green]{name}[/green] ({int(score)}% match)"
-                                for name, score, _ in similar_files
-                            ],
-                        ]
-                    ),
-                    title="Suggestions",
-                    border_style="blue",
-                )
-                console.print(suggestions)
-            else:
-                console.print(
-                    "[yellow]No similar files found. Make sure the linked file exists and is properly named.[/yellow]"
-                )
-
-            raise HandledBuildError(f"Broken link in {note.filename}: {match.group(0)}")
-
-        remote_path = path_to_remote[filename]
-        to_replace.append((text, local_link, remote_path))
+        # Find the closest match in our path_to_remote index
+        closest_match = process.extractOne(clean_link, path_to_remote.keys())
+        if closest_match and closest_match[1] >= 95:
+            remote_path = path_to_remote[closest_match[0]]
+            to_replace.append((text, local_link, remote_path))
+            LOGGER.info(f"Converting link: {local_link} -> {remote_path}")
+        else:
+            LOGGER.info(f"No match found for local link: {clean_link}")
 
     # The combination of text & link should be enough to uniquely identify link
     # location and swap with the correct link
@@ -118,14 +76,21 @@ def local_to_remote_links(
         search_text = f"[{text}]({local_link})"
         replace_text = f"[{text}]({remote_path})"
         note_text = note_text.replace(search_text, replace_text)
+        LOGGER.info(f"Replaced text: {search_text} -> {replace_text}")
 
     # Same replacement logic for raw images
-    for _text, local_link, remote_path in to_replace:
-        note_text = sub(
-            f"<img(.*?)src=[\"']{re_escape(local_link)}[\"'](.*?)/?>",
-            f'<img\\1src="{re_escape(remote_path)}"\\2/>',
-            note_text,
-        )
+    for local_link in html_images:
+        if not parser.is_external_url(local_link):
+            # Remove any relative path indicators and file extension
+            clean_link = Path(local_link.lstrip("./")).with_suffix("").name
+            closest_match = process.extractOne(clean_link, path_to_remote.keys())
+            if closest_match and closest_match[1] >= 95:
+                remote_path = path_to_remote[closest_match[0]]
+                note_text = sub(
+                    f"<img(.*?)src=[\"']{re_escape(local_link)}[\"'](.*?)/?>",
+                    f'<img\\1src="{re_escape(remote_path)}"\\2/>',
+                    note_text,
+                )
 
     # Treat escape characters specially, since these are used as bash coloring
     note_text = note_text.replace("\\x1b", "\x1b")

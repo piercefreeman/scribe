@@ -59,9 +59,10 @@
     function showModal(modal, snapshotId, date) {
         modal.style.display = 'flex';
         // Update the date and open link in the modal
-        modal.querySelector('.snapshot-date').textContent = formatDate(date);
+        modal.querySelector('.snapshot-date').textContent = `Archived on ${formatDate(date)}`;
         const openTabLink = modal.querySelector('#snapshot-open-tab');
-        openTabLink.href = `/snapshots/${snapshotId}/snapshot.html`;
+        const activeLink = document.querySelector(`a[snapshot-id="${snapshotId}"]`);
+        openTabLink.href = activeLink.getAttribute('data-snapshot-url');
         
         // Small delay to ensure display:flex is applied before transitions
         requestAnimationFrame(() => {

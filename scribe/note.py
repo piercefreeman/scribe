@@ -3,6 +3,7 @@ from logging import warning
 from os import environ
 from pathlib import Path
 from re import sub
+from textwrap import dedent
 from typing import Optional
 
 from bs4 import BeautifulSoup
@@ -15,6 +16,8 @@ from markdown.extensions.tables import TableExtension
 from scribe.asset import Asset
 from scribe.backup import backup_file
 from scribe.constants import READING_WPM
+from scribe.logging import LOGGER
+from scribe.markdown import MarkdownParser
 from scribe.metadata import FeaturedPhotoPayload, NoteMetadata
 from scribe.parsers import (
     InvalidMetadataFormatError,
@@ -26,6 +29,8 @@ from scribe.parsers import (
     parse_title,
 )
 
+MEDIA_SUFFIX_WHITELIST = {".png", ".jpeg", ".jpg"}
+
 
 class Note:
     """
@@ -35,16 +40,22 @@ class Note:
     """
 
     text: str
+    """Raw markdown content"""
 
     title: str
+    """Title of the note"""
+
     metadata: NoteMetadata
+    """Metadata for the note"""
 
-    # Text-only content with markdown stripped, mostly used for previews
     simple_content: str
+    """Text-only content with markdown stripped, mostly used for previews"""
 
-    filename: str | None = None
-    path: Path | None = None
-    _html_content: Optional[str] = None
+    filename: str | None
+    """Filename of the note, only set if the note is on disk"""
+
+    path: Path | None
+    """Path to the note, only set if the note is on disk"""
 
     def __init__(
         self,
@@ -61,6 +72,8 @@ class Note:
         self.metadata = metadata
         self.filename = filename
         self.path = Path(path) if path else None
+
+        self._html_content: str | None = None
 
     @property
     def html_content(self) -> Optional[str]:
@@ -107,11 +120,13 @@ class Note:
             first_line = lines[0]  # Title should be here since NoTitleError would have caught it
             rest_of_file = "\n".join(lines[1:])
 
-            stub_metadata = f"""
-meta:
-    date: {datetime.now().strftime("%B %-d, %Y")}
-    status: scratch
-"""
+            stub_metadata = dedent(
+                f"""
+                meta:
+                    date: {datetime.now().strftime("%B %-d, %Y")}
+                    status: scratch
+                """
+            )
             new_text = f"{first_line}\n{stub_metadata}\n{rest_of_file}"
 
             # Write the modified file
@@ -146,22 +161,37 @@ meta:
     @property
     def assets(self) -> list[Asset]:
         """
-        Get a list of the raw assets that are within this parent folder. These might or
-        might not be referenced in the body of the article.
-
+        Get a list of assets that are referenced in the note's text or metadata.
+        This includes:
+        1. Images referenced in the markdown/HTML content
+        2. Featured photos from the metadata
         """
-        # Text only notes don't have assets
         if not self.path:
             warning(f"Note {self} has no path; cannot fetch assets.")
             return []
 
-        suffix_whitelist = {".png", ".jpeg", ".jpg"}
-        assets = []
-        for path in self.path.parent.iterdir():
-            if path.suffix in suffix_whitelist:
-                assets.append(Asset(self, path))
+        # Get all referenced image paths
+        referenced_images = MarkdownParser.extract_referenced_images(self.text)
 
-        # De-duplicate the full images and previews, which are also found by our glob search
+        # Add featured photos from metadata
+        featured_photos = {
+            Path(photo.path if isinstance(photo, FeaturedPhotoPayload) else photo).name
+            for photo in self.metadata.featured_photos
+        }
+
+        all_referenced = referenced_images | featured_photos
+        LOGGER.debug(f"All referenced images for {self.title}: {all_referenced}")
+
+        # Only process images that are referenced and match our allowed file suffixes
+        assets = []
+
+        for path in self.path.parent.iterdir():
+            if path.suffix.lower() in MEDIA_SUFFIX_WHITELIST and path.name in all_referenced:
+                assets.append(Asset(self, path))
+            elif path.suffix.lower() in MEDIA_SUFFIX_WHITELIST:
+                LOGGER.debug(f"Skipping unreferenced asset: {path}")
+
+        # De-duplicate the full images and previews
         return list(set(assets))
 
     @property
@@ -254,8 +284,8 @@ meta:
         return self._html_content
 
     def has_footnotes(self):
-        # Find footnote definitions in the text
-        return self.text.find("[^") != -1
+        """Check if the note contains any footnotes."""
+        return MarkdownParser.has_footnotes(self.text)
 
     def get_preview(self):
         return "\n".join(self.metadata.subtitle)
