@@ -1,12 +1,12 @@
-from itertools import chain
 from pathlib import Path
 from re import escape as re_escape
-from re import finditer, sub
+from re import sub
 
 from rapidfuzz import process
 from rich.console import Console
 
 from scribe.logging import LOGGER
+from scribe.markdown import MarkdownParser
 from scribe.note import Note
 
 console = Console()
@@ -23,29 +23,22 @@ def local_to_remote_links(
 
     :param path_to_remote: Specify the mapping from the local path (without path prefix)
         and the remote location of the file.
-
     """
     LOGGER.info(f"Converting links for note: {note.title}")
     note_text = note.text
+    parser = MarkdownParser()
 
-    # Search for links that haven't been escaped with a \ prior to them
-    markdown_matches = finditer(r"[^\\]\[(.*?)\]\((.+?)\)", note_text)
-    img_matches = finditer(r"<(img).*?src=[\"'](.*?)[\"'].*?/?>", note_text)
-    matches = chain(markdown_matches, img_matches)
+    # Get all markdown links and HTML images
+    markdown_links = parser.find_markdown_links(note_text)
+    html_images = parser.find_html_images(note_text)
 
-    local_links = [
-        match
-        for match in matches
-        if not any(
-            [
-                "http://" in match.group(2),
-                "https://" in match.group(2),
-                "www." in match.group(2),
-            ]
-        )
-    ]
+    # Filter out external links
+    local_links = []
+    for text, url in markdown_links:
+        if not parser.is_external_url(url):
+            local_links.append((text, url))
 
-    LOGGER.info(f"Found local links: {[match.group(2) for match in local_links]}")
+    LOGGER.info(f"Found local links: {[url for _, url in local_links]}")
 
     # Augment the remote path with links to our media files
     # We choose to use the preview images even if the local paths are pointed
@@ -61,24 +54,18 @@ def local_to_remote_links(
     # [(text, local link, remote link)]
     to_replace = []
 
-    for match in local_links:
-        text = match.group(1)
-        local_link = match.group(2)
-
-        # Remove any relative path indicators
-        local_link = local_link.lstrip("./")
-
-        # Remove any file extension
-        local_link = Path(local_link).with_suffix("").name
+    for text, local_link in local_links:
+        # Remove any relative path indicators and file extension
+        clean_link = Path(local_link.lstrip("./")).with_suffix("").name
 
         # Find the closest match in our path_to_remote index
-        closest_match = process.extractOne(local_link, path_to_remote.keys())
+        closest_match = process.extractOne(clean_link, path_to_remote.keys())
         if closest_match and closest_match[1] >= 95:
             remote_path = path_to_remote[closest_match[0]]
-            to_replace.append((text, match.group(2), remote_path))
-            LOGGER.info(f"Converting link: {match.group(2)} -> {remote_path}")
+            to_replace.append((text, local_link, remote_path))
+            LOGGER.info(f"Converting link: {local_link} -> {remote_path}")
         else:
-            LOGGER.info(f"No match found for local link: {local_link}")
+            LOGGER.info(f"No match found for local link: {clean_link}")
 
     # The combination of text & link should be enough to uniquely identify link
     # location and swap with the correct link
@@ -92,12 +79,18 @@ def local_to_remote_links(
         LOGGER.info(f"Replaced text: {search_text} -> {replace_text}")
 
     # Same replacement logic for raw images
-    for _text, local_link, remote_path in to_replace:
-        note_text = sub(
-            f"<img(.*?)src=[\"']{re_escape(local_link)}[\"'](.*?)/?>",
-            f'<img\\1src="{re_escape(remote_path)}"\\2/>',
-            note_text,
-        )
+    for local_link in html_images:
+        if not parser.is_external_url(local_link):
+            # Remove any relative path indicators and file extension
+            clean_link = Path(local_link.lstrip("./")).with_suffix("").name
+            closest_match = process.extractOne(clean_link, path_to_remote.keys())
+            if closest_match and closest_match[1] >= 95:
+                remote_path = path_to_remote[closest_match[0]]
+                note_text = sub(
+                    f"<img(.*?)src=[\"']{re_escape(local_link)}[\"'](.*?)/?>",
+                    f'<img\\1src="{re_escape(remote_path)}"\\2/>',
+                    note_text,
+                )
 
     # Treat escape characters specially, since these are used as bash coloring
     note_text = note_text.replace("\\x1b", "\x1b")

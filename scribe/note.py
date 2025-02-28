@@ -2,7 +2,8 @@ from datetime import datetime
 from logging import warning
 from os import environ
 from pathlib import Path
-from re import finditer, sub
+from re import sub
+from textwrap import dedent
 from typing import Optional
 
 from bs4 import BeautifulSoup
@@ -16,6 +17,7 @@ from scribe.asset import Asset
 from scribe.backup import backup_file
 from scribe.constants import READING_WPM
 from scribe.logging import LOGGER
+from scribe.markdown import MarkdownParser
 from scribe.metadata import FeaturedPhotoPayload, NoteMetadata
 from scribe.parsers import (
     InvalidMetadataFormatError,
@@ -38,16 +40,22 @@ class Note:
     """
 
     text: str
+    """Raw markdown content"""
 
     title: str
+    """Title of the note"""
+
     metadata: NoteMetadata
+    """Metadata for the note"""
 
-    # Text-only content with markdown stripped, mostly used for previews
     simple_content: str
+    """Text-only content with markdown stripped, mostly used for previews"""
 
-    filename: str | None = None
-    path: Path | None = None
-    _html_content: Optional[str] = None
+    filename: str | None
+    """Filename of the note, only set if the note is on disk"""
+
+    path: Path | None
+    """Path to the note, only set if the note is on disk"""
 
     def __init__(
         self,
@@ -64,6 +72,8 @@ class Note:
         self.metadata = metadata
         self.filename = filename
         self.path = Path(path) if path else None
+
+        self._html_content: str | None = None
 
     @property
     def html_content(self) -> Optional[str]:
@@ -110,11 +120,13 @@ class Note:
             first_line = lines[0]  # Title should be here since NoTitleError would have caught it
             rest_of_file = "\n".join(lines[1:])
 
-            stub_metadata = f"""
-meta:
-    date: {datetime.now().strftime("%B %-d, %Y")}
-    status: scratch
-"""
+            stub_metadata = dedent(
+                f"""
+                meta:
+                    date: {datetime.now().strftime("%B %-d, %Y")}
+                    status: scratch
+                """
+            )
             new_text = f"{first_line}\n{stub_metadata}\n{rest_of_file}"
 
             # Write the modified file
@@ -146,35 +158,6 @@ meta:
             simple_content=get_simple_content(text),
         )
 
-    def _find_referenced_images(self) -> set[str]:
-        """
-        Find all image paths referenced in the note's text, either through markdown
-        or HTML img tags.
-        """
-        # Find markdown image links ![alt](path)
-        markdown_matches = finditer(r"!\[(.*?)\]\((.+?)\)", self.text)
-        # Find HTML image tags <img src="path" />
-        html_matches = finditer(r"<(img).*?src=[\"'](.*?)[\"'].*?/?>", self.text)
-
-        image_paths = set()
-
-        # Extract paths from markdown matches
-        for match in markdown_matches:
-            path = match.group(2)
-            # Remove any relative path indicators and get just the filename
-            path = Path(path.lstrip(".")).name
-            image_paths.add(path)
-
-        # Extract paths from HTML matches
-        for match in html_matches:
-            path = match.group(2)
-            # Remove any relative path indicators and get just the filename
-            path = Path(path.lstrip(".")).name
-            image_paths.add(path)
-
-        LOGGER.debug(f"Found referenced images in {self.title}: {image_paths}")
-        return image_paths
-
     @property
     def assets(self) -> list[Asset]:
         """
@@ -188,7 +171,7 @@ meta:
             return []
 
         # Get all referenced image paths
-        referenced_images = self._find_referenced_images()
+        referenced_images = MarkdownParser.extract_referenced_images(self.text)
 
         # Add featured photos from metadata
         featured_photos = {
@@ -301,8 +284,8 @@ meta:
         return self._html_content
 
     def has_footnotes(self):
-        # Find footnote definitions in the text
-        return self.text.find("[^") != -1
+        """Check if the note contains any footnotes."""
+        return MarkdownParser.has_footnotes(self.text)
 
     def get_preview(self):
         return "\n".join(self.metadata.subtitle)
