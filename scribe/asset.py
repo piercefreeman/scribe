@@ -31,15 +31,18 @@ class Asset:
 
     @property
     def local_preview_path(self):
-        return self.path.parent / f"{self.preview_name}{self.path.suffix}"
+        preview_path = self.path.parent / f"{self.preview_name}{self.path.suffix}"
+        return preview_path
 
     @property
     def remote_path(self):
-        return f"/images/{self.root_path}-{self.name}{self.path.suffix}"
+        remote = f"/images/{self.root_path}-{self.name}{self.path.suffix}"
+        return remote
 
     @property
     def remote_preview_path(self):
-        return f"/images/{self.root_path}-{self.preview_name}{self.path.suffix}"
+        remote_preview = f"/images/{self.root_path}-{self.preview_name}{self.path.suffix}"
+        return remote_preview
 
     def __hash__(self):
         return hash(self.path)

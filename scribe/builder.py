@@ -19,6 +19,7 @@ from rich.tree import Tree
 from scribe.exceptions import HandledBuildError
 from scribe.io import get_asset_path
 from scribe.links import local_to_remote_links
+from scribe.logging import LOGGER
 from scribe.metadata import BuildMetadata, FeaturedPhotoPosition, NoteStatus
 from scribe.models import PageDefinition, PageDirection, TemplateArguments
 from scribe.note import Asset, Note
@@ -289,8 +290,12 @@ class WebsiteBuilder:
             )
 
     def process_asset(self, asset: Asset, output_path: Path):
+        LOGGER.info(f"\nProcessing asset: {asset.local_path}")
+        LOGGER.info(f"Output path: {output_path}")
+
         # Skip if already processed
         if not self.build_state.needs_rebuild(asset.local_path):
+            LOGGER.info(f"Asset already processed: {asset.local_path}")
             return
 
         # Don't process preview files separately, process as part of their main asset package
@@ -308,6 +313,7 @@ class WebsiteBuilder:
                 subsampling=2,  # Corresponds to 4:2:0
                 progressive=True,
             )
+            LOGGER.info("Preview image created successfully")
 
         # Copy the preview image
         # Use a relative path to make sure we place it correctly in the output path
@@ -322,6 +328,7 @@ class WebsiteBuilder:
 
         # Mark as successfully processed
         self.build_state.mark_built(asset.local_path)
+        LOGGER.info(f"Asset processing complete: {asset.local_path}\n")
 
     def augment_page_directions(self, arguments: TemplateArguments):
         """

@@ -5,10 +5,8 @@ from re import finditer, sub
 
 from rapidfuzz import process
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
 
-from scribe.exceptions import HandledBuildError
+from scribe.logging import LOGGER
 from scribe.note import Note
 
 console = Console()
@@ -27,6 +25,7 @@ def local_to_remote_links(
         and the remote location of the file.
 
     """
+    LOGGER.info(f"Converting links for note: {note.title}")
     note_text = note.text
 
     # Search for links that haven't been escaped with a \ prior to them
@@ -46,6 +45,8 @@ def local_to_remote_links(
         )
     ]
 
+    LOGGER.info(f"Found local links: {[match.group(2) for match in local_links]}")
+
     # Augment the remote path with links to our media files
     # We choose to use the preview images even if the local paths are pointed
     # to the full quality versions, since this is how we want to render them on first load
@@ -60,54 +61,24 @@ def local_to_remote_links(
     # [(text, local link, remote link)]
     to_replace = []
 
-    # Swap the local links with their actual remote counterparts
     for match in local_links:
         text = match.group(1)
         local_link = match.group(2)
 
-        filename = Path(local_link).with_suffix("").name
-        if filename not in path_to_remote:
-            # Find similar filenames using fuzzy matching
-            similar_files = process.extract(
-                filename,
-                path_to_remote.keys(),
-                limit=5,
-                score_cutoff=50,  # Only show reasonably similar matches
-            )
+        # Remove any relative path indicators
+        local_link = local_link.lstrip("./")
 
-            error_text = Text()
-            error_text.append("\nBroken link in ", style="red bold")
-            error_text.append(note.filename or "unknown", style="yellow")
-            error_text.append("\nCannot find: ", style="red")
-            error_text.append(match.group(0), style="yellow")
-            error_text.append("\nFull path: ", style="red")
-            error_text.append(str(note.path or "unknown"), style="yellow")
-            console.print(error_text)
+        # Remove any file extension
+        local_link = Path(local_link).with_suffix("").name
 
-            if similar_files:
-                suggestions = Panel(
-                    "\n".join(
-                        [
-                            "[yellow]Did you mean:[/yellow]",
-                            *[
-                                f"[green]{name}[/green] ({int(score)}% match)"
-                                for name, score, _ in similar_files
-                            ],
-                        ]
-                    ),
-                    title="Suggestions",
-                    border_style="blue",
-                )
-                console.print(suggestions)
-            else:
-                console.print(
-                    "[yellow]No similar files found. Make sure the linked file exists and is properly named.[/yellow]"
-                )
-
-            raise HandledBuildError(f"Broken link in {note.filename}: {match.group(0)}")
-
-        remote_path = path_to_remote[filename]
-        to_replace.append((text, local_link, remote_path))
+        # Find the closest match in our path_to_remote index
+        closest_match = process.extractOne(local_link, path_to_remote.keys())
+        if closest_match and closest_match[1] >= 95:
+            remote_path = path_to_remote[closest_match[0]]
+            to_replace.append((text, match.group(2), remote_path))
+            LOGGER.info(f"Converting link: {match.group(2)} -> {remote_path}")
+        else:
+            LOGGER.info(f"No match found for local link: {local_link}")
 
     # The combination of text & link should be enough to uniquely identify link
     # location and swap with the correct link
@@ -118,6 +89,7 @@ def local_to_remote_links(
         search_text = f"[{text}]({local_link})"
         replace_text = f"[{text}]({remote_path})"
         note_text = note_text.replace(search_text, replace_text)
+        LOGGER.info(f"Replaced text: {search_text} -> {replace_text}")
 
     # Same replacement logic for raw images
     for _text, local_link, remote_path in to_replace:

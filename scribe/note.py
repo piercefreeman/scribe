@@ -2,7 +2,7 @@ from datetime import datetime
 from logging import warning
 from os import environ
 from pathlib import Path
-from re import sub
+from re import finditer, sub
 from typing import Optional
 
 from bs4 import BeautifulSoup
@@ -15,6 +15,7 @@ from markdown.extensions.tables import TableExtension
 from scribe.asset import Asset
 from scribe.backup import backup_file
 from scribe.constants import READING_WPM
+from scribe.logging import LOGGER
 from scribe.metadata import FeaturedPhotoPayload, NoteMetadata
 from scribe.parsers import (
     InvalidMetadataFormatError,
@@ -25,6 +26,8 @@ from scribe.parsers import (
     parse_metadata,
     parse_title,
 )
+
+MEDIA_SUFFIX_WHITELIST = {".png", ".jpeg", ".jpg"}
 
 
 class Note:
@@ -143,25 +146,69 @@ meta:
             simple_content=get_simple_content(text),
         )
 
+    def _find_referenced_images(self) -> set[str]:
+        """
+        Find all image paths referenced in the note's text, either through markdown
+        or HTML img tags.
+        """
+        # Find markdown image links ![alt](path)
+        markdown_matches = finditer(r"!\[(.*?)\]\((.+?)\)", self.text)
+        # Find HTML image tags <img src="path" />
+        html_matches = finditer(r"<(img).*?src=[\"'](.*?)[\"'].*?/?>", self.text)
+
+        image_paths = set()
+
+        # Extract paths from markdown matches
+        for match in markdown_matches:
+            path = match.group(2)
+            # Remove any relative path indicators and get just the filename
+            path = Path(path.lstrip(".")).name
+            image_paths.add(path)
+
+        # Extract paths from HTML matches
+        for match in html_matches:
+            path = match.group(2)
+            # Remove any relative path indicators and get just the filename
+            path = Path(path.lstrip(".")).name
+            image_paths.add(path)
+
+        LOGGER.debug(f"Found referenced images in {self.title}: {image_paths}")
+        return image_paths
+
     @property
     def assets(self) -> list[Asset]:
         """
-        Get a list of the raw assets that are within this parent folder. These might or
-        might not be referenced in the body of the article.
-
+        Get a list of assets that are referenced in the note's text or metadata.
+        This includes:
+        1. Images referenced in the markdown/HTML content
+        2. Featured photos from the metadata
         """
-        # Text only notes don't have assets
         if not self.path:
             warning(f"Note {self} has no path; cannot fetch assets.")
             return []
 
-        suffix_whitelist = {".png", ".jpeg", ".jpg"}
-        assets = []
-        for path in self.path.parent.iterdir():
-            if path.suffix in suffix_whitelist:
-                assets.append(Asset(self, path))
+        # Get all referenced image paths
+        referenced_images = self._find_referenced_images()
 
-        # De-duplicate the full images and previews, which are also found by our glob search
+        # Add featured photos from metadata
+        featured_photos = {
+            Path(photo.path if isinstance(photo, FeaturedPhotoPayload) else photo).name
+            for photo in self.metadata.featured_photos
+        }
+
+        all_referenced = referenced_images | featured_photos
+        LOGGER.debug(f"All referenced images for {self.title}: {all_referenced}")
+
+        # Only process images that are referenced and match our allowed file suffixes
+        assets = []
+
+        for path in self.path.parent.iterdir():
+            if path.suffix.lower() in MEDIA_SUFFIX_WHITELIST and path.name in all_referenced:
+                assets.append(Asset(self, path))
+            elif path.suffix.lower() in MEDIA_SUFFIX_WHITELIST:
+                LOGGER.debug(f"Skipping unreferenced asset: {path}")
+
+        # De-duplicate the full images and previews
         return list(set(assets))
 
     @property
