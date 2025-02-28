@@ -14,7 +14,7 @@ from scribe.note import Note
 
 console = Console()
 
-MAX_SNAPSHOT_SIZE = 45 * 1024 * 1024  # 45MB
+MAX_SNAPSHOT_SIZE = 75 * 1024 * 1024
 
 
 @dataclass
