@@ -96,9 +96,8 @@
 
         let activeLink = null;
 
-        // Find all links with snapshot-id
-        document.querySelectorAll('a[snapshot-id]').forEach(link => {
-            // Hover handlers
+        // Find all links with snapshot-id, including those in footnotes
+        const setupSnapshotLink = (link) => {
             link.addEventListener('mouseenter', () => {
                 activeLink = link;
                 commandHint.style.opacity = '1';
@@ -108,7 +107,30 @@
                 activeLink = null;
                 commandHint.style.opacity = '0';
             });
+        };
+
+        // Setup initial links
+        document.querySelectorAll('a[snapshot-id]').forEach(setupSnapshotLink);
+
+        // Setup a mutation observer to handle dynamically added footnotes
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        node.querySelectorAll('a[snapshot-id]').forEach(setupSnapshotLink);
+                    }
+                });
+            });
         });
+
+        // Observe the footnotes container for changes
+        const footnotesContainer = document.getElementById('footnotes-inline');
+        if (footnotesContainer) {
+            observer.observe(footnotesContainer, { 
+                childList: true,
+                subtree: true 
+            });
+        }
 
         // Keyboard shortcut handler
         document.addEventListener('keydown', (e) => {
