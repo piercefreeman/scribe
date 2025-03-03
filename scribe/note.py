@@ -3,6 +3,7 @@ from os import getenv
 from pathlib import Path
 from re import sub
 from textwrap import dedent
+from typing import ClassVar
 
 from bs4 import BeautifulSoup
 from markdown import markdown
@@ -27,6 +28,7 @@ from scribe.parsers import (
     parse_metadata,
     parse_title,
 )
+from scribe.snapshot import SnapshotMetadata, get_url_hash
 
 MEDIA_SUFFIX_WHITELIST = {".png", ".jpeg", ".jpg"}
 
@@ -63,6 +65,9 @@ class Note(BaseModel):
     assets: list[Asset] = []
     """List of all assets (images, etc.) referenced in the note's content"""
 
+    snapshots: dict[str, SnapshotMetadata] = {}
+    """List of all snapshots for the note"""
+
     featured_assets: list[FeaturedPhotoPayload] = []
     """List of featured photos specifically designated for photo collages or prominent display"""
 
@@ -77,6 +82,13 @@ class Note(BaseModel):
 
     visible_tag: str | None = None
     """Status tag that's only visible in development environment"""
+
+    force_recompute: ClassVar[set[str]] = {
+        "text",
+        "metadata",
+        "assets",
+        "snapshots",
+    }
 
     model_config = ConfigDict(frozen=True)
 
@@ -155,11 +167,12 @@ class Note(BaseModel):
 
     def model_copy(self, update: dict) -> "Note":  # type: ignore
         # If we are updating the text, we need to recompute the html content
-        if "text" in update or "metadata" in update or "assets" in update:
+        if any(key in update for key in self.force_recompute):
             text = update.get("text", self.text)
             metadata = update.get("metadata", self.metadata)
             assets = update.get("assets", self.assets)
-            update["html_content"] = self.compute_html_content(text, metadata, assets)
+            snapshots = update.get("snapshots", self.snapshots)
+            update["html_content"] = self.compute_html_content(text, metadata, assets, snapshots)
 
         return super().model_copy(update=update)
 
@@ -263,12 +276,21 @@ class Note(BaseModel):
         can be expensive and may not always be needed.
         """
         values["html_content"] = cls.compute_html_content(
-            values["text"], values["metadata"], values.get("assets", [])
+            values["text"],
+            values["metadata"],
+            values.get("assets", []),
+            values.get("snapshots", {}),
         )
         return values
 
     @classmethod
-    def compute_html_content(cls, text: str, metadata: NoteMetadata, assets: list[Asset]) -> str:
+    def compute_html_content(
+        cls,
+        text: str,
+        metadata: NoteMetadata,
+        assets: list[Asset],
+        snapshots: dict[str, SnapshotMetadata],
+    ) -> str:
         html = markdown(
             text,
             extensions=[
@@ -308,5 +330,14 @@ class Note(BaseModel):
                                 )
                             img["srcset"] = ", ".join(srcset_parts)
                             break
+
+        for link in content.find_all("a"):
+            # Find the metadata for this link
+            href = link["href"]
+            snapshot_metadata = snapshots.get(href)
+            if snapshot_metadata:
+                link["snapshot-id"] = get_url_hash(href)
+                for key, value in snapshot_metadata.to_link_attributes().items():
+                    link[key] = value
 
         return str(content)

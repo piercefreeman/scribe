@@ -6,11 +6,12 @@ from datetime import datetime
 from hashlib import md5
 from pathlib import Path
 from re import finditer, sub
-from typing import Set
+from typing import TYPE_CHECKING, Set
 
 from rich.console import Console
 
-from scribe.note import Note
+if TYPE_CHECKING:
+    from scribe.note import Note
 
 console = Console()
 
@@ -72,7 +73,7 @@ class SnapshotMetadata:
         }
 
 
-def extract_urls_from_note(note: Note) -> Set[str]:
+def extract_urls_from_note(note: "Note") -> Set[str]:
     """
     Extract all external URLs from a note's markdown content.
 

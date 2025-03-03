@@ -220,13 +220,11 @@ class WebsiteBuilder:
         for note in notes:
             try:
                 # Process snapshots if they exist
-                html_content = (
-                    self._handle_snapshot(note.html_content, snapshots_dir, output_path)
+                new_note = (
+                    self._handle_snapshot(note, snapshots_dir, output_path)
                     if snapshots_dir.exists()
-                    else note.html_content
+                    else note
                 )
-
-                new_note = note.model_copy(update={"html_content": html_content})
 
                 # Save the processed note with the modified HTML
                 processed_notes.append(new_note)
@@ -484,7 +482,7 @@ class WebsiteBuilder:
             directions=directions,
         )
 
-    def _handle_snapshot(self, html_content: str, snapshots_dir: Path, output_dir: Path) -> str:
+    def _handle_snapshot(self, note: Note, snapshots_dir: Path, output_dir: Path) -> Note:
         """
         Process HTML content to:
         1. Find all external links
@@ -500,9 +498,11 @@ class WebsiteBuilder:
         Returns:
             Modified HTML content with snapshot attributes added
         """
-        soup = BeautifulSoup(html_content, "html.parser")
+        soup = BeautifulSoup(note.html_content, "html.parser")
         snapshot_output_dir = output_dir / "snapshots"
         snapshot_output_dir.mkdir(exist_ok=True)
+
+        processed_links: dict[str, SnapshotMetadata] = {}
 
         for link in soup.find_all("a", href=True):
             href = link["href"]
@@ -521,10 +521,8 @@ class WebsiteBuilder:
                     try:
                         metadata = SnapshotMetadata.from_file(metadata_file)
 
-                        # Add snapshot-id and metadata attributes to the link
-                        link["snapshot-id"] = snapshot_id
-                        for key, value in metadata.to_link_attributes().items():
-                            link[key] = value
+                        # Add this metadata to the lookup table for this note
+                        processed_links[href] = metadata
 
                         # Copy only the HTML snapshot if it hasn't been copied yet
                         source_html = snapshot_dir / "snapshot.html"
@@ -535,9 +533,11 @@ class WebsiteBuilder:
                             target_dir.mkdir(exist_ok=True)
                             copy2(source_html, target_html)
                             console.print(f"[green]Copied snapshot for {href}[/green]")
+
                     except Exception as e:
                         console.print(
                             f"[red]Error processing snapshot metadata for {href}: {str(e)}[/red]"
                         )
 
-        return str(soup)
+        new_note = note.model_copy(update={"snapshots": processed_links})
+        return new_note
