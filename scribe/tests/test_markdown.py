@@ -86,9 +86,9 @@ Not an image: [Link](not-an-image.jpg)
     assert images == {
         "image1.jpg",
         "image2.png",
-        "image3.jpg",
+        "./subfolder/image3.jpg",
         "image4.png",
-        "image5.jpg",
+        "https://example.com/image5.jpg",
     }
 
 
