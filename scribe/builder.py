@@ -298,6 +298,9 @@ class WebsiteBuilder:
                     asset = asset.model_copy(update={"resolution_map": resolution_map})
                     LOGGER.info(f"Asset resolution map: {asset.resolution_map}")
 
+                # Ensure the cache directory exists
+                asset.cache_dir.mkdir(parents=True, exist_ok=True)
+
                 # Don't process preview files separately, process as part of their main asset package
                 # Compress the assets if we don't already have a compressed version
                 if not asset.local_preview_path.exists():
@@ -329,11 +332,13 @@ class WebsiteBuilder:
 
                 # Copy the preview image
                 remote_path = output_path / f"./{asset.remote_preview_path}"
+                remote_path.parent.mkdir(parents=True, exist_ok=True)
                 if not remote_path.exists():
                     copyfile(asset.local_preview_path, remote_path)
 
                 # Copy the raw
                 remote_path = output_path / f"./{asset.remote_path}"
+                remote_path.parent.mkdir(parents=True, exist_ok=True)
                 if not remote_path.exists():
                     copyfile(asset.local_path, remote_path)
 
@@ -342,6 +347,7 @@ class WebsiteBuilder:
                     local_dpi_path = asset.get_dpi_path(dpi)
                     if local_dpi_path.exists():
                         remote_dpi_path = output_path / f"./{asset.get_remote_dpi_path(dpi)}"
+                        remote_dpi_path.parent.mkdir(parents=True, exist_ok=True)
                         if not remote_dpi_path.exists():
                             copyfile(local_dpi_path, remote_dpi_path)
 

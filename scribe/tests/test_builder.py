@@ -85,6 +85,7 @@ def test_skip_hidden_directories(builder: WebsiteBuilder, note_directory: Path):
 
     notes = builder.get_notes(note_directory)
     assert len(notes) == 1
+    assert notes[0].path is not None
     assert notes[0].path.name == "visible_note.md"
 
 
@@ -147,13 +148,13 @@ def test_get_paginated_arguments_multiple_pages(builder: WebsiteBuilder, publish
 
 def test_augment_page_directions_no_offset_limit(builder: WebsiteBuilder):
     arguments = TemplateArguments()
-    result = builder.augment_page_directions(arguments)
+    result = builder._augment_page_directions(arguments)
     assert result.directions is None
 
 
 def test_augment_page_directions_first_page(builder: WebsiteBuilder, published_note: Note):
     arguments = TemplateArguments(notes=[published_note] * 10, offset=0, limit=5)
-    result = builder.augment_page_directions(arguments)
+    result = builder._augment_page_directions(arguments)
     assert result.directions is not None
     assert len(result.directions) == 1
     assert result.directions[0].direction == "next"
@@ -161,7 +162,7 @@ def test_augment_page_directions_first_page(builder: WebsiteBuilder, published_n
 
 def test_augment_page_directions_middle_page(builder: WebsiteBuilder, published_note: Note):
     arguments = TemplateArguments(notes=[published_note] * 15, offset=5, limit=5)
-    result = builder.augment_page_directions(arguments)
+    result = builder._augment_page_directions(arguments)
     assert result.directions is not None
     assert len(result.directions) == 2
     assert result.directions[0].direction == "previous"

@@ -41,13 +41,18 @@ class Asset(BaseModel):
         return self.path
 
     @property
+    def cache_dir(self) -> Path:
+        """Get the .scribe cache directory for this asset"""
+        return self.path.parent / ".scribe" / self.root_path / self.name
+
+    @property
     def local_preview_path(self):
-        preview_path = self.path.parent / f"{self.preview_name}{self.path.suffix}"
-        return preview_path
+        """Get the path for the preview version in the cache directory"""
+        return self.cache_dir / f"{self.preview_name}{self.path.suffix}"
 
     def get_dpi_path(self, dpi: int) -> Path:
-        """Get the path for a specific DPI version"""
-        return self.path.parent / f"{self.name}-{dpi}dpi{self.path.suffix}"
+        """Get the path for a specific DPI version in the cache directory"""
+        return self.cache_dir / f"{self.name}-{dpi}dpi{self.path.suffix}"
 
     @property
     def remote_path(self):

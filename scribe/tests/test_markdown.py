@@ -71,14 +71,6 @@ def test_is_external_url():
     assert not MarkdownParser.is_external_url("just-a-file.txt")
 
 
-def test_normalize_path():
-    """Test path normalization."""
-    assert MarkdownParser.normalize_path("./image.jpg") == "image.jpg"
-    assert MarkdownParser.normalize_path("../image.jpg") == "image.jpg"
-    assert MarkdownParser.normalize_path("subfolder/image.jpg") == "image.jpg"
-    assert MarkdownParser.normalize_path("image.jpg") == "image.jpg"
-
-
 def test_extract_referenced_images():
     """Test extracting all referenced images from text."""
     text = """

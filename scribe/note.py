@@ -50,29 +50,32 @@ class Note(BaseModel):
     simple_content: str
     """Text-only content with markdown stripped, mostly used for previews"""
 
-    filename: str | None
+    filename: str | None = None
     """Filename of the note, only set if the note is on disk"""
 
-    path: Path | None
+    path: Path | None = None
     """Path to the note, only set if the note is on disk"""
 
+    #
     # Computed fields that are validated at creation time
+    #
+
     assets: list[Asset] = []
     """List of all assets (images, etc.) referenced in the note's content"""
 
     featured_assets: list[FeaturedPhotoPayload] = []
     """List of featured photos specifically designated for photo collages or prominent display"""
 
-    webpage_path: str
+    webpage_path: str = ""
     """URL-friendly path generated from the note's title for web routing"""
 
-    html_content: str
+    html_content: str = ""
     """Rendered HTML content of the note, processed from markdown with extensions"""
 
-    read_time_minutes: int
+    read_time_minutes: int = 0
     """Estimated reading time in minutes based on word count"""
 
-    visible_tag: str | None
+    visible_tag: str | None = None
     """Status tag that's only visible in development environment"""
 
     model_config = ConfigDict(frozen=True)
@@ -150,7 +153,7 @@ class Note(BaseModel):
             simple_content=get_simple_content(text),
         )
 
-    def model_copy(self, update: dict) -> "Note":
+    def model_copy(self, update: dict) -> "Note":  # type: ignore
         # If we are updating the text, we need to recompute the html content
         if "text" in update or "metadata" in update or "assets" in update:
             text = update.get("text", self.text)
