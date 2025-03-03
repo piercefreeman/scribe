@@ -1,5 +1,5 @@
 from datetime import datetime
-from os import environ
+from os import getenv
 from pathlib import Path
 from re import sub
 from textwrap import dedent
@@ -251,7 +251,7 @@ class Note(BaseModel):
         """Compute the visible tag based on environment and status."""
         values["visible_tag"] = (
             str(values["metadata"].status.value)
-            if environ["SCRIBE_ENVIRONMENT"] == "DEVELOPMENT"
+            if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT"
             else None
         )
         return values
