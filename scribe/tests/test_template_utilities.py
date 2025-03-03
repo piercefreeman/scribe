@@ -10,7 +10,7 @@ from scribe.template_utilities import filter_tag, group_by_month
 def note_with_tags():
     metadata = NoteMetadata(tags=["tag1", "tag2"], date=datetime.datetime(2022, 1, 1))
     return Note(
-        "test note",
+        text="test note",
         metadata=metadata,
         title="test title",
         simple_content="test content",
@@ -21,7 +21,7 @@ def note_with_tags():
 def note_with_date():
     metadata = NoteMetadata(date=datetime.datetime(2022, 1, 1))
     return Note(
-        "test note",
+        text="test note",
         metadata=metadata,
         title="test title",
         simple_content="test content",
@@ -32,21 +32,21 @@ def note_with_date():
 def multiple_notes():
     metadata1 = NoteMetadata(tags=["tag1", "tag2"], date=datetime.datetime(2022, 2, 1))
     note1 = Note(
-        "test note 1",
+        text="test note 1",
         title="test title",
         simple_content="test content",
         metadata=metadata1,
     )
     metadata2 = NoteMetadata(tags=["tag2", "tag3"], date=datetime.datetime(2022, 1, 1))
     note2 = Note(
-        "test note 2",
+        text="test note 2",
         title="test title",
         simple_content="test content",
         metadata=metadata2,
     )
     metadata3 = NoteMetadata(tags=["tag3", "tag4"], date=datetime.datetime(2022, 1, 3))
     note3 = Note(
-        "test note 3",
+        text="test note 3",
         title="test title",
         simple_content="test content",
         metadata=metadata3,

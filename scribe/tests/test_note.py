@@ -24,7 +24,7 @@ def test_webpage_path():
 def test_get_markdown():
     text = create_test_note(header="Header", body="## Subheader\nContent")
     find_pattern = "<h2>Subheader</h2>\n<p>Content</p>"
-    assert match(find_pattern, Note.from_text(text=text, path="/fake-path.md").get_html())
+    assert match(find_pattern, Note.from_text(text=text, path="/fake-path.md").html_content)
 
 
 def test_published():

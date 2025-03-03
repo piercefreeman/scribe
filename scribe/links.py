@@ -1,5 +1,4 @@
 from pathlib import Path
-from re import escape as re_escape
 from re import sub
 
 from rapidfuzz import process
@@ -30,13 +29,10 @@ def local_to_remote_links(
 
     # Get all markdown links and HTML images
     markdown_links = parser.find_markdown_links(note_text)
-    html_images = parser.find_html_images(note_text)
+    html_images = parser.extract_referenced_images(note_text)
 
     # Filter out external links
-    local_links = []
-    for text, url in markdown_links:
-        if not parser.is_external_url(url):
-            local_links.append((text, url))
+    local_links = [(text, url) for text, url in markdown_links if not parser.is_external_url(url)]
 
     LOGGER.info(f"Found local links: {[url for _, url in local_links]}")
 
@@ -65,7 +61,7 @@ def local_to_remote_links(
             to_replace.append((text, local_link, remote_path))
             LOGGER.info(f"Converting link: {local_link} -> {remote_path}")
         else:
-            LOGGER.info(f"No match found for local link: {clean_link}")
+            LOGGER.warning(f"No match found for local link: {clean_link}")
 
     # The combination of text & link should be enough to uniquely identify link
     # location and swap with the correct link
@@ -86,11 +82,10 @@ def local_to_remote_links(
             closest_match = process.extractOne(clean_link, path_to_remote.keys())
             if closest_match and closest_match[1] >= 95:
                 remote_path = path_to_remote[closest_match[0]]
-                note_text = sub(
-                    f"<img(.*?)src=[\"']{re_escape(local_link)}[\"'](.*?)/?>",
-                    f'<img\\1src="{re_escape(remote_path)}"\\2/>',
-                    note_text,
-                )
+                note_text = note_text.replace(local_link, remote_path)
+                LOGGER.info(f"Replaced image: {local_link} -> {remote_path}")
+            else:
+                LOGGER.warning(f"No match found for local image: {clean_link}")
 
     # Treat escape characters specially, since these are used as bash coloring
     note_text = note_text.replace("\\x1b", "\x1b")

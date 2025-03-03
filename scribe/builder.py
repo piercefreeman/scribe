@@ -16,6 +16,7 @@ from PIL.Image import Resampling
 from rich.console import Console
 from rich.tree import Tree
 
+from scribe.asset import WEB_DPI
 from scribe.exceptions import HandledBuildError
 from scribe.io import get_asset_path
 from scribe.links import local_to_remote_links
@@ -84,31 +85,21 @@ class WebsiteBuilder:
                 secho("No notes found", fg="yellow")
                 return
 
-            # Process each note
-            processed_notes = []
-            for note in notes:
-                try:
-                    # Generate HTML content
-                    html_content = note.get_html()
-
-                    # Process snapshots if they exist
-                    if snapshots_dir.exists():
-                        html_content = self.process_snapshots(
-                            html_content, snapshots_dir, output_path
-                        )
-
-                    # Save the processed note with the modified HTML
-                    note.html_content = html_content
-                    processed_notes.append(note)
-                except InvalidMetadataError as e:
-                    console.print(f"[red]Invalid metadata in {note.path}:[/red] {str(e)}")
-                    exit(1)
-                except Exception as e:
-                    console.print(f"[red]Error processing {note.path}:[/red] {str(e)}")
-                    raise HandledBuildError() from e
-
             # Sort notes by date
-            processed_notes = sorted(processed_notes, key=lambda x: x.metadata.date, reverse=True)
+            processed_notes = sorted(notes, key=lambda x: x.metadata.date, reverse=True)
+
+            build_metadata = BuildMetadata()
+
+            # The static build phase will inject the stylesheet hashes that will be used
+            # for cache invalidation in subsequent pages
+            console.print("[blue]Building static assets[/blue]")
+            self.build_static(output_path, build_metadata)
+
+            # Add snapshot metadata to the note html
+            console.print("[blue]Building note text[/blue]")
+            processed_notes = self.process_links(processed_notes)
+            processed_notes = self.process_snapshots(processed_notes, snapshots_dir, output_path)
+            processed_notes = self.process_assets(processed_notes, output_path)
 
             # When developing locally it's nice to preview draft notes on the homepage as they will look live
             # But require this as an explicit env variable
@@ -118,13 +109,6 @@ class WebsiteBuilder:
                 published_notes = [
                     note for note in processed_notes if note.metadata.status == NoteStatus.PUBLISHED
                 ]
-
-            build_metadata = BuildMetadata()
-
-            # The static build phase will inject the stylesheet hashes that will be used
-            # for cache invalidation in subsequent pages
-            console.print("[blue]Building static assets[/blue]")
-            self.build_static(output_path, build_metadata)
 
             # Build all notes that are either in draft form or published. Draft notes require a unique
             # URL to access them but should be displayed publically
@@ -193,15 +177,11 @@ class WebsiteBuilder:
             if not self.build_state.needs_rebuild(note.path):
                 continue
 
-            # Format the images / media associated with this note
-            for asset in note.assets:
-                self.process_asset(asset, output_path=output_path)
-
             console.print(f"[yellow]Building {note.title}[/yellow]")
 
-            possible_notes = list(
+            possible_note_paths = list(
                 {
-                    candidate_note
+                    candidate_note.path
                     for tag, all_notes in notes_by_tag.items()
                     for candidate_note in all_notes
                     if tag in note.metadata.tags
@@ -209,6 +189,7 @@ class WebsiteBuilder:
                     and not note.metadata.external_link
                 }
             )
+            possible_notes = [note for note in published_notes if note.path in possible_note_paths]
             relevant_notes = sample(possible_notes, min(3, len(possible_notes)))
 
             # Conditional post template based on tags
@@ -222,7 +203,7 @@ class WebsiteBuilder:
                     post_template.render(
                         header=note.title,
                         metadata=note.metadata,
-                        content=note.get_html(),
+                        content=note.html_content,
                         has_footnotes=note.has_footnotes(),
                         build_metadata=build_metadata,
                         relevant_notes=relevant_notes,
@@ -230,7 +211,157 @@ class WebsiteBuilder:
                 )
 
             # Mark as successfully built
-            self.build_state.mark_built(note.path)
+            if note.path is not None:
+                self.build_state.mark_built(note.path)
+
+    def process_snapshots(self, notes: list[Note], snapshots_dir: Path, output_path: Path):
+        # Process each note
+        processed_notes: list[Note] = []
+        for note in notes:
+            try:
+                # Process snapshots if they exist
+                new_note = (
+                    self._handle_snapshot(note, snapshots_dir, output_path)
+                    if snapshots_dir.exists()
+                    else note
+                )
+
+                # Save the processed note with the modified HTML
+                processed_notes.append(new_note)
+            except InvalidMetadataError as e:
+                console.print(f"[red]Invalid metadata in {note.path}:[/red] {str(e)}")
+                exit(1)
+            except Exception as e:
+                console.print(f"[red]Error processing {note.path}:[/red] {str(e)}")
+                raise HandledBuildError() from e
+
+        return processed_notes
+
+    def process_links(self, notes: list[Note]):
+        # Notes are accessible by both their filename and title
+        path_to_remote = {
+            alias: f"/notes/{note.webpage_path}"
+            for note in notes
+            for alias in [note.filename, note.title]
+        }
+
+        # Process each note's links, skipping those with broken links
+        processed_notes: list[Note] = []
+        found_error = False
+        for note in notes:
+            try:
+                new_note = note.model_copy(
+                    update={"text": local_to_remote_links(note, path_to_remote)}
+                )
+                processed_notes.append(new_note)
+            except HandledBuildError:
+                console.print(f"[yellow]Skipping {note.title} due to broken links[/yellow]")
+                found_error = True
+                continue
+
+        if found_error:
+            console.print(
+                "[yellow]Some notes were skipped due to errors. Fix the issues and rebuild to include them.[/yellow]"
+            )
+
+        return processed_notes
+
+    def process_assets(self, notes: list[Note], output_path: Path):
+        processed_notes: list[Note] = []
+
+        for note in notes:
+            processed_assets: list[Asset] = []
+
+            for asset in note.assets:
+                LOGGER.info(f"\nProcessing asset: {asset.local_path}")
+                LOGGER.info(f"Output path: {output_path}")
+
+                # Skip if already processed
+                if not self.build_state.needs_rebuild(asset.local_path):
+                    LOGGER.info(f"Asset already processed: {asset.local_path}")
+                    processed_assets.append(asset)
+                    continue
+
+                # Create resolution map based on DPI
+                with Image.open(asset.local_path) as img:
+                    dpi = img.info.get("dpi", (WEB_DPI, WEB_DPI))[0]  # Get horizontal DPI
+
+                    resolution_map = {}
+                    if dpi > WEB_DPI:
+                        # Round DPI to nearest integer to avoid float key issues
+                        dpi_int = round(dpi)
+                        resolution_map = {WEB_DPI: "1x", dpi_int: f"{dpi_int / WEB_DPI:.1f}x"}
+
+                    # Update the asset with the resolution map
+                    asset = asset.model_copy(update={"resolution_map": resolution_map})
+                    LOGGER.info(f"Asset resolution map: {asset.resolution_map}")
+
+                # Ensure the cache directory exists
+                asset.cache_dir.mkdir(parents=True, exist_ok=True)
+
+                # Don't process preview files separately, process as part of their main asset package
+                # Compress the assets if we don't already have a compressed version
+                if not asset.local_preview_path.exists():
+                    # Create preview image - always at standard DPI
+                    image = Image.open(asset.local_path)
+                    image.thumbnail((3200, maxsize), Resampling.LANCZOS)
+                    image.save(
+                        asset.local_preview_path,
+                        quality=95,
+                        dpi=(72, 72),  # Always save preview at standard DPI
+                        subsampling=2,  # Corresponds to 4:2:0
+                        progressive=True,
+                    )
+                    LOGGER.info("Preview image created successfully")
+
+                # Create DPI variants based on the resolution map
+                for dpi in asset.resolution_map.keys():
+                    dpi_path = asset.get_dpi_path(dpi)
+                    if not dpi_path.exists():
+                        # TODO: We should improve our image processing pipeline to downsample these files
+                        # based on image size, not DPI
+                        image = Image.open(asset.local_path)
+                        image.thumbnail((3200, maxsize), Resampling.LANCZOS)
+                        image.save(
+                            dpi_path,
+                            quality=95,
+                            dpi=(dpi, dpi),
+                            subsampling=2,
+                            progressive=True,
+                        )
+                        LOGGER.info(f"{dpi} DPI version created successfully")
+
+                # Copy the preview image
+                remote_path = output_path / f"./{asset.remote_preview_path}"
+                remote_path.parent.mkdir(parents=True, exist_ok=True)
+                if not remote_path.exists():
+                    copyfile(asset.local_preview_path, remote_path)
+
+                # Copy the raw
+                remote_path = output_path / f"./{asset.remote_path}"
+                remote_path.parent.mkdir(parents=True, exist_ok=True)
+                if not remote_path.exists():
+                    copyfile(asset.local_path, remote_path)
+
+                # Copy DPI variants if they exist
+                for dpi in asset.resolution_map.keys():
+                    local_dpi_path = asset.get_dpi_path(dpi)
+                    if local_dpi_path.exists():
+                        remote_dpi_path = output_path / f"./{asset.get_remote_dpi_path(dpi)}"
+                        remote_dpi_path.parent.mkdir(parents=True, exist_ok=True)
+                        if not remote_dpi_path.exists():
+                            copyfile(local_dpi_path, remote_dpi_path)
+
+                # Mark as successfully processed
+                self.build_state.mark_built(asset.local_path)
+                processed_assets.append(asset)
+                LOGGER.info(f"Asset processing complete: {asset.local_path}\n")
+
+            # Update the note with the processed assets
+            new_note = note.model_copy(update={"assets": processed_assets})
+            processed_notes.append(new_note)
+
+        return processed_notes
 
     def build_pages(
         self,
@@ -244,7 +375,7 @@ class WebsiteBuilder:
 
             template = self.env.get_template(page.template)
             page_args = page.page_args or TemplateArguments()
-            page_args = self.augment_page_directions(page_args)
+            page_args = self._augment_page_directions(page_args)
 
             with open(output_path / page.url, "w") as file:
                 file.write(template.render(**asdict(page_args), build_metadata=build_metadata))
@@ -289,73 +420,8 @@ class WebsiteBuilder:
                 offset=offset,
             )
 
-    def process_asset(self, asset: Asset, output_path: Path):
-        LOGGER.info(f"\nProcessing asset: {asset.local_path}")
-        LOGGER.info(f"Output path: {output_path}")
-
-        # Skip if already processed
-        if not self.build_state.needs_rebuild(asset.local_path):
-            LOGGER.info(f"Asset already processed: {asset.local_path}")
-            return
-
-        # Don't process preview files separately, process as part of their main asset package
-        # Compress the assets if we don't already have a compressed version
-        if not asset.local_preview_path.exists():
-            # The image quality, on a scale from 1 (worst) to 95 (best)
-            image = Image.open(asset.local_path)
-            # image.thumbnail((1600, maxsize), Resampling.LANCZOS)
-            image.thumbnail((3200, maxsize), Resampling.LANCZOS)
-            # image.save(preview_image_path, "JPEG", quality=95, dpi=(300, 300), subsampling=0)
-            image.save(
-                asset.local_preview_path,
-                quality=95,
-                dpi=(300, 300),
-                subsampling=2,  # Corresponds to 4:2:0
-                progressive=True,
-            )
-            LOGGER.info("Preview image created successfully")
-
-        # Copy the preview image
-        # Use a relative path to make sure we place it correctly in the output path
-        remote_path = output_path / f"./{asset.remote_preview_path}"
-        if not remote_path.exists():
-            copyfile(asset.local_preview_path, remote_path)
-
-        # Copy the raw
-        remote_path = output_path / f"./{asset.remote_path}"
-        if not remote_path.exists():
-            copyfile(asset.local_path, remote_path)
-
-        # Mark as successfully processed
-        self.build_state.mark_built(asset.local_path)
-        LOGGER.info(f"Asset processing complete: {asset.local_path}\n")
-
-    def augment_page_directions(self, arguments: TemplateArguments):
-        """
-        Use the metadata in a TemplateArgument to determine if there are additional
-        pages in the sequence.
-
-        """
-        if arguments.offset is None or arguments.limit is None:
-            return arguments
-
-        note_count = len(arguments.notes) if arguments.notes else 0
-
-        page_index = arguments.offset // arguments.limit
-        has_next = arguments.offset + arguments.limit < note_count
-        has_previous = page_index > 0
-
-        directions = []
-        directions += [PageDirection("previous", page_index - 1)] if has_previous else []
-        directions += [PageDirection("next", page_index + 1)] if has_next else []
-
-        return replace(
-            arguments,
-            directions=directions,
-        )
-
-    def get_notes(self, notes_path: Path):
-        notes = []
+    def get_notes(self, notes_path: Path) -> list[Note]:
+        notes: list[Note] = []
         found_error = False
 
         # Create a tree for visual display of notes
@@ -393,33 +459,33 @@ class WebsiteBuilder:
         if found_error:
             exit(1)
 
-        # Notes are accessible by both their filename and title
-        path_to_remote = {
-            alias: f"/notes/{note.webpage_path}"
-            for note in notes
-            for alias in [note.filename, note.title]
-        }
+        return notes
 
-        # Process each note's links, skipping those with broken links
-        processed_notes = []
-        for note in notes:
-            try:
-                note.text = local_to_remote_links(note, path_to_remote)
-                processed_notes.append(note)
-            except HandledBuildError:
-                console.print(f"[yellow]Skipping {note.title} due to broken links[/yellow]")
-                found_error = True
-                continue
+    def _augment_page_directions(self, arguments: TemplateArguments):
+        """
+        Use the metadata in a TemplateArgument to determine if there are additional
+        pages in the sequence.
 
-        if found_error:
-            console.print(
-                "[yellow]Some notes were skipped due to errors. Fix the issues and rebuild to include them.[/yellow]"
-            )
+        """
+        if arguments.offset is None or arguments.limit is None:
+            return arguments
 
-        processed_notes = sorted(processed_notes, key=lambda x: x.metadata.date, reverse=True)
-        return processed_notes
+        note_count = len(arguments.notes) if arguments.notes else 0
 
-    def process_snapshots(self, html_content: str, snapshots_dir: Path, output_dir: Path) -> str:
+        page_index = arguments.offset // arguments.limit
+        has_next = arguments.offset + arguments.limit < note_count
+        has_previous = page_index > 0
+
+        directions = []
+        directions += [PageDirection("previous", page_index - 1)] if has_previous else []
+        directions += [PageDirection("next", page_index + 1)] if has_next else []
+
+        return replace(
+            arguments,
+            directions=directions,
+        )
+
+    def _handle_snapshot(self, note: Note, snapshots_dir: Path, output_dir: Path) -> Note:
         """
         Process HTML content to:
         1. Find all external links
@@ -435,9 +501,11 @@ class WebsiteBuilder:
         Returns:
             Modified HTML content with snapshot attributes added
         """
-        soup = BeautifulSoup(html_content, "html.parser")
+        soup = BeautifulSoup(note.html_content, "html.parser")
         snapshot_output_dir = output_dir / "snapshots"
         snapshot_output_dir.mkdir(exist_ok=True)
+
+        processed_links: dict[str, SnapshotMetadata] = {}
 
         for link in soup.find_all("a", href=True):
             href = link["href"]
@@ -456,10 +524,8 @@ class WebsiteBuilder:
                     try:
                         metadata = SnapshotMetadata.from_file(metadata_file)
 
-                        # Add snapshot-id and metadata attributes to the link
-                        link["snapshot-id"] = snapshot_id
-                        for key, value in metadata.to_link_attributes().items():
-                            link[key] = value
+                        # Add this metadata to the lookup table for this note
+                        processed_links[href] = metadata
 
                         # Copy only the HTML snapshot if it hasn't been copied yet
                         source_html = snapshot_dir / "snapshot.html"
@@ -470,9 +536,11 @@ class WebsiteBuilder:
                             target_dir.mkdir(exist_ok=True)
                             copy2(source_html, target_html)
                             console.print(f"[green]Copied snapshot for {href}[/green]")
+
                     except Exception as e:
                         console.print(
                             f"[red]Error processing snapshot metadata for {href}: {str(e)}[/red]"
                         )
 
-        return str(soup)
+        new_note = note.model_copy(update={"snapshots": processed_links})
+        return new_note

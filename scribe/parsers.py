@@ -111,5 +111,5 @@ def get_raw_text(text, parsed_payloads: list[ParsedPayload]) -> str:
 
 def get_simple_content(text: str):
     html = markdown(text.split("\n")[0])
-    content = "".join(BeautifulSoup(html, "html.parser").findAll(text=True))
+    content = "".join(BeautifulSoup(html, "html.parser").find_all(text=True))
     return sub(r"\s", " ", content)

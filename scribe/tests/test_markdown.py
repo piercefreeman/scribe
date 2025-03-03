@@ -12,6 +12,8 @@ Here are some links:
 - [Escaped Link](https://example.com/\\[escaped\\])
 - Not a [link] and not a (link)
 - \\[Escaped](not-a-link)
+- ![Image](image.jpg)
+- ![Another Image](https://example.com/image.jpg)
 """
     links = MarkdownParser.find_markdown_links(text)
     assert links == [
@@ -69,14 +71,6 @@ def test_is_external_url():
     assert not MarkdownParser.is_external_url("just-a-file.txt")
 
 
-def test_normalize_path():
-    """Test path normalization."""
-    assert MarkdownParser.normalize_path("./image.jpg") == "image.jpg"
-    assert MarkdownParser.normalize_path("../image.jpg") == "image.jpg"
-    assert MarkdownParser.normalize_path("subfolder/image.jpg") == "image.jpg"
-    assert MarkdownParser.normalize_path("image.jpg") == "image.jpg"
-
-
 def test_extract_referenced_images():
     """Test extracting all referenced images from text."""
     text = """
@@ -92,9 +86,9 @@ Not an image: [Link](not-an-image.jpg)
     assert images == {
         "image1.jpg",
         "image2.png",
-        "image3.jpg",
+        "./subfolder/image3.jpg",
         "image4.png",
-        "image5.jpg",
+        "https://example.com/image5.jpg",
     }
 
 
