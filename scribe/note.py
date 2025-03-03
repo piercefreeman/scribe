@@ -1,10 +1,8 @@
 from datetime import datetime
-from logging import warning
 from os import environ
 from pathlib import Path
 from re import sub
 from textwrap import dedent
-from typing import Optional
 
 from bs4 import BeautifulSoup
 from markdown import markdown
@@ -12,6 +10,7 @@ from markdown.extensions.codehilite import CodeHiliteExtension
 from markdown.extensions.fenced_code import FencedCodeExtension
 from markdown.extensions.footnotes import FootnoteExtension
 from markdown.extensions.tables import TableExtension
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from scribe.asset import Asset
 from scribe.backup import backup_file
@@ -32,7 +31,7 @@ from scribe.parsers import (
 MEDIA_SUFFIX_WHITELIST = {".png", ".jpeg", ".jpg"}
 
 
-class Note:
+class Note(BaseModel):
     """
     A dynamic entry of a note. Handles the processing of raw markdown data into
     a python object that's able to be inserted into the template engine.
@@ -57,33 +56,26 @@ class Note:
     path: Path | None
     """Path to the note, only set if the note is on disk"""
 
-    def __init__(
-        self,
-        text: str,
-        title: str,
-        simple_content: str,
-        metadata: NoteMetadata,
-        filename: str | None = None,
-        path: Optional[Path | str] = None,
-    ):
-        self.text = text
-        self.title = title
-        self.simple_content = simple_content
-        self.metadata = metadata
-        self.filename = filename
-        self.path = Path(path) if path else None
+    # Computed fields that are validated at creation time
+    assets: list[Asset] = []
+    """List of all assets (images, etc.) referenced in the note's content"""
 
-        self._html_content: str | None = None
+    featured_assets: list[FeaturedPhotoPayload] = []
+    """List of featured photos specifically designated for photo collages or prominent display"""
 
-    @property
-    def html_content(self) -> Optional[str]:
-        """Get the cached HTML content if it exists."""
-        return self._html_content
+    webpage_path: str
+    """URL-friendly path generated from the note's title for web routing"""
 
-    @html_content.setter
-    def html_content(self, content: str) -> None:
-        """Set the cached HTML content."""
-        self._html_content = content
+    html_content: str
+    """Rendered HTML content of the note, processed from markdown with extensions"""
+
+    read_time_minutes: int
+    """Estimated reading time in minutes based on word count"""
+
+    visible_tag: str | None
+    """Status tag that's only visible in development environment"""
+
+    model_config = ConfigDict(frozen=True)
 
     @classmethod
     def from_file(cls, path: Path):
@@ -98,7 +90,7 @@ class Note:
         except NoTitleError:
             # Backup the original file
             backup_path = backup_file(path)
-            warning(f"Backed up original file to {backup_path}")
+            LOGGER.warning(f"Backed up original file to {backup_path}")
 
             # Add a stub title with the current date
             stub_header = f"# Draft Note {datetime.now().strftime('%Y-%m-%d')}\n\n"
@@ -108,12 +100,12 @@ class Note:
             with open(path, "w") as f:
                 f.write(new_text)
 
-            warning(f"Added stub title to {path}")
+            LOGGER.warning(f"Added stub title to {path}")
             return cls.from_file(path)
         except MissingMetadataBlockError:
             # Backup the original file
             backup_path = backup_file(path)
-            warning(f"Backed up original file to {backup_path}")
+            LOGGER.warning(f"Backed up original file to {backup_path}")
 
             # Add a stub metadata block after the title
             lines = text.split("\n")
@@ -133,7 +125,7 @@ class Note:
             with open(path, "w") as f:
                 f.write(new_text)
 
-            warning(f"Added stub metadata block to {path}")
+            LOGGER.warning(f"Added stub metadata block to {path}")
             return cls.from_text(
                 path=path,
                 text=new_text,
@@ -158,59 +150,57 @@ class Note:
             simple_content=get_simple_content(text),
         )
 
-    @property
-    def assets(self) -> list[Asset]:
-        """
-        Get a list of assets that are referenced in the note's text or metadata.
-        This includes:
-        1. Images referenced in the markdown/HTML content
-        2. Featured photos from the metadata
-        """
+    def model_copy(self, update: dict) -> "Note":
+        # If we are updating the text, we need to recompute the html content
+        if "text" in update:
+            update["html_content"] = self.compute_html_content(update["text"], self.metadata)
+
+        return super().model_copy(update=update)
+
+    def has_footnotes(self) -> bool:
+        """Check if the note contains any footnotes."""
+        return MarkdownParser.has_footnotes(self.text)
+
+    def get_preview(self) -> str:
+        return "\n".join(self.metadata.subtitle)
+
+    @model_validator(mode="after")
+    def compute_assets(self) -> "Note":  # noqa: N805
+        """Compute assets referenced in the note's text or metadata."""
         if not self.path:
-            warning(f"Note {self} has no path; cannot fetch assets.")
-            return []
+            LOGGER.warning(f"Note {self} has no path; cannot fetch assets.")
+            object.__setattr__(self, "assets", [])
+            return self
 
-        # Get all referenced image paths
-        referenced_images = MarkdownParser.extract_referenced_images(self.text)
-
-        # Add featured photos from metadata
+        referenced_images = {
+            Path(path).name for path in MarkdownParser.extract_referenced_images(self.text)
+        }
         featured_photos = {
             Path(photo.path if isinstance(photo, FeaturedPhotoPayload) else photo).name
             for photo in self.metadata.featured_photos
         }
-
         all_referenced = referenced_images | featured_photos
         LOGGER.debug(f"All referenced images for {self.title}: {all_referenced}")
 
-        # Only process images that are referenced and match our allowed file suffixes
         assets = []
-
         for path in self.path.parent.iterdir():
             if path.suffix.lower() in MEDIA_SUFFIX_WHITELIST and path.name in all_referenced:
-                assets.append(Asset(self, path))
+                assets.append(Asset.from_note(self, path))
             elif path.suffix.lower() in MEDIA_SUFFIX_WHITELIST:
                 LOGGER.debug(f"Skipping unreferenced asset: {path}")
 
-        # De-duplicate the full images and previews
-        return list(set(assets))
+        object.__setattr__(self, "assets", list(set(assets)))
+        return self
 
-    @property
-    def featured_assets(self) -> list[FeaturedPhotoPayload]:
-        """
-        Featured assets are located on photo collages. This function
-        parses the user payloads, which can be either a raw string or a payload
-        that customizes more metadata about how the photo is featured.
-
-        It returns a normalzied FeaturedPhotoPayload with an asset attached.
-
-        """
-        # While technically the featured assets appear within the text, we can't get the absolute
-        # path to the images without the note also having a path
+    @model_validator(mode="after")
+    def compute_featured_assets(self) -> "Note":  # noqa: N805
+        """Compute featured assets for photo collages."""
+        featured_photos = []
         if not self.path:
-            warning(f"Note {self} has no path; cannot fetch featured assets.")
-            return []
+            LOGGER.warning(f"Note {self} has no path; cannot fetch featured assets.")
+            object.__setattr__(self, "featured_assets", featured_photos)
+            return self
 
-        featured_photos: list[FeaturedPhotoPayload] = []
         for photo_definition in self.metadata.featured_photos:
             featured_payload: FeaturedPhotoPayload | None = None
 
@@ -225,38 +215,54 @@ class Note:
             if not full_path.exists():
                 raise ValueError(f"Unknown path: {full_path}")
 
-            featured_payload.asset = Asset(self, full_path)
+            featured_payload.asset = Asset.from_note(self, full_path)
             featured_photos.append(featured_payload)
 
-        return featured_photos
+        object.__setattr__(self, "featured_assets", featured_photos)
+        return self
 
-    @property
-    def webpage_path(self) -> str:
-        """
-        Get the desired webpage path for this note. This path is based
-        on a cleaned version of the header, so conflicts might occur.
+    @model_validator(mode="before")
+    def compute_webpage_path(cls, values: dict) -> dict:  # noqa: N805
+        """Compute the webpage path based on the note's title."""
+        if not values.get("title"):
+            raise ValueError(f"No header found for: {values.get('filename')}")
 
-        """
-        # Require each post to have a header
-        if not self.title:
-            raise ValueError(f"No header found for: {self.filename}")
-
-        # Published notes should have a human readible URL
-        header = self.title.lower()
+        header = values["title"].lower()
         header = sub(r"[^a-zA-Z0-9\s]", "", header)
         header_tokens = header.split()[:20]
-        return "-".join(header_tokens)
+        values["webpage_path"] = "-".join(header_tokens)
+        return values
 
-    def get_html(self) -> str:
-        """
-        Get the HTML content for this note. If we've already processed it during build,
-        return the cached version, otherwise generate it.
-        """
-        if self._html_content is not None:
-            return self._html_content
+    @model_validator(mode="before")
+    def compute_read_time(cls, values: dict) -> dict:  # noqa: N805
+        """Compute estimated reading time in minutes."""
+        words = len(values["text"].split())
+        values["read_time_minutes"] = (words // READING_WPM) + 1
+        return values
 
+    @model_validator(mode="before")
+    def compute_visible_tag(cls, values: dict) -> dict:  # noqa: N805
+        """Compute the visible tag based on environment and status."""
+        values["visible_tag"] = (
+            str(values["metadata"].status.value)
+            if environ["SCRIBE_ENVIRONMENT"] == "DEVELOPMENT"
+            else None
+        )
+        return values
+
+    @model_validator(mode="before")
+    def cache_html_content(cls, values: dict) -> dict:  # noqa: N805
+        """
+        Compute the HTML content for this note. This is done lazily since HTML generation
+        can be expensive and may not always be needed.
+        """
+        values["html_content"] = cls.compute_html_content(values["text"], values["metadata"])
+        return values
+
+    @classmethod
+    def compute_html_content(cls, text: str, metadata: NoteMetadata) -> str:
         html = markdown(
-            self.text,
+            text,
             extensions=[
                 CodeHiliteExtension(use_pygments=True),
                 FencedCodeExtension(),
@@ -273,31 +279,11 @@ class Note:
             image_classes = img.get("class", [])
 
             # Travel specific styling
-            if "travel" in self.metadata.tags:
+            if "travel" in metadata.tags:
                 image_classes.append("large-image")
             else:
                 image_classes.append("small-image")
 
             img["class"] = " ".join(image_classes)
 
-        self._html_content = str(content)
-        return self._html_content
-
-    def has_footnotes(self):
-        """Check if the note contains any footnotes."""
-        return MarkdownParser.has_footnotes(self.text)
-
-    def get_preview(self):
-        return "\n".join(self.metadata.subtitle)
-
-    @property
-    def read_time_minutes(self):
-        words = len(self.text.split())
-        return (words // READING_WPM) + 1
-
-    @property
-    def visible_tag(self):
-        # Only show post status during development
-        if environ["SCRIBE_ENVIRONMENT"] == "DEVELOPMENT":
-            return str(self.metadata.status.value)
-        return None
+        return str(content)

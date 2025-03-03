@@ -1,11 +1,13 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
+
 if TYPE_CHECKING:
     from scribe.note import Note
 
 
-class Asset:
+class Asset(BaseModel):
     """
     Assets are tied to their parent note. This class normalizes assets
     to be the full quality image. In other words we'll convert preview links
@@ -13,9 +15,15 @@ class Asset:
 
     """
 
-    def __init__(self, note: "Note", path: Path):
-        self.root_path = note.webpage_path
-        self.path = Path(str(path).replace("-preview", "")).absolute()
+    root_path: str
+    path: Path
+
+    @classmethod
+    def from_note(cls, note: "Note", path: Path):
+        root_path = note.webpage_path
+        path = Path(str(path).replace("-preview", "")).absolute()
+
+        return cls(root_path=root_path, path=path)
 
     @property
     def name(self):

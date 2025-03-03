@@ -84,31 +84,20 @@ class WebsiteBuilder:
                 secho("No notes found", fg="yellow")
                 return
 
-            # Process each note
-            processed_notes = []
-            for note in notes:
-                try:
-                    # Generate HTML content
-                    html_content = note.get_html()
-
-                    # Process snapshots if they exist
-                    if snapshots_dir.exists():
-                        html_content = self.process_snapshots(
-                            html_content, snapshots_dir, output_path
-                        )
-
-                    # Save the processed note with the modified HTML
-                    note.html_content = html_content
-                    processed_notes.append(note)
-                except InvalidMetadataError as e:
-                    console.print(f"[red]Invalid metadata in {note.path}:[/red] {str(e)}")
-                    exit(1)
-                except Exception as e:
-                    console.print(f"[red]Error processing {note.path}:[/red] {str(e)}")
-                    raise HandledBuildError() from e
-
             # Sort notes by date
-            processed_notes = sorted(processed_notes, key=lambda x: x.metadata.date, reverse=True)
+            processed_notes = sorted(notes, key=lambda x: x.metadata.date, reverse=True)
+
+            build_metadata = BuildMetadata()
+
+            # The static build phase will inject the stylesheet hashes that will be used
+            # for cache invalidation in subsequent pages
+            console.print("[blue]Building static assets[/blue]")
+            self.build_static(output_path, build_metadata)
+
+            # Add snapshot metadata to the note html
+            console.print("[blue]Building note text[/blue]")
+            processed_notes = self.build_links(processed_notes)
+            processed_notes = self.build_snapshots(processed_notes, snapshots_dir, output_path)
 
             # When developing locally it's nice to preview draft notes on the homepage as they will look live
             # But require this as an explicit env variable
@@ -118,13 +107,6 @@ class WebsiteBuilder:
                 published_notes = [
                     note for note in processed_notes if note.metadata.status == NoteStatus.PUBLISHED
                 ]
-
-            build_metadata = BuildMetadata()
-
-            # The static build phase will inject the stylesheet hashes that will be used
-            # for cache invalidation in subsequent pages
-            console.print("[blue]Building static assets[/blue]")
-            self.build_static(output_path, build_metadata)
 
             # Build all notes that are either in draft form or published. Draft notes require a unique
             # URL to access them but should be displayed publically
@@ -194,14 +176,15 @@ class WebsiteBuilder:
                 continue
 
             # Format the images / media associated with this note
+            LOGGER.info(f"Processing assets for {note.title}: {len(note.assets)}")
             for asset in note.assets:
                 self.process_asset(asset, output_path=output_path)
 
             console.print(f"[yellow]Building {note.title}[/yellow]")
 
-            possible_notes = list(
+            possible_note_paths = list(
                 {
-                    candidate_note
+                    candidate_note.path
                     for tag, all_notes in notes_by_tag.items()
                     for candidate_note in all_notes
                     if tag in note.metadata.tags
@@ -209,6 +192,7 @@ class WebsiteBuilder:
                     and not note.metadata.external_link
                 }
             )
+            possible_notes = [note for note in published_notes if note.path in possible_note_paths]
             relevant_notes = sample(possible_notes, min(3, len(possible_notes)))
 
             # Conditional post template based on tags
@@ -222,7 +206,7 @@ class WebsiteBuilder:
                     post_template.render(
                         header=note.title,
                         metadata=note.metadata,
-                        content=note.get_html(),
+                        content=note.html_content,
                         has_footnotes=note.has_footnotes(),
                         build_metadata=build_metadata,
                         relevant_notes=relevant_notes,
@@ -230,7 +214,62 @@ class WebsiteBuilder:
                 )
 
             # Mark as successfully built
-            self.build_state.mark_built(note.path)
+            if note.path is not None:
+                self.build_state.mark_built(note.path)
+
+    def build_snapshots(self, notes: list[Note], snapshots_dir: Path, output_path: Path):
+        # Process each note
+        processed_notes: list[Note] = []
+        for note in notes:
+            try:
+                # Process snapshots if they exist
+                html_content = (
+                    self.process_snapshots(note.html_content, snapshots_dir, output_path)
+                    if snapshots_dir.exists()
+                    else note.html_content
+                )
+
+                new_note = note.model_copy(update={"html_content": html_content})
+
+                # Save the processed note with the modified HTML
+                processed_notes.append(new_note)
+            except InvalidMetadataError as e:
+                console.print(f"[red]Invalid metadata in {note.path}:[/red] {str(e)}")
+                exit(1)
+            except Exception as e:
+                console.print(f"[red]Error processing {note.path}:[/red] {str(e)}")
+                raise HandledBuildError() from e
+
+        return processed_notes
+
+    def build_links(self, notes: list[Note]):
+        # Notes are accessible by both their filename and title
+        path_to_remote = {
+            alias: f"/notes/{note.webpage_path}"
+            for note in notes
+            for alias in [note.filename, note.title]
+        }
+
+        # Process each note's links, skipping those with broken links
+        processed_notes: list[Note] = []
+        found_error = False
+        for note in notes:
+            try:
+                new_note = note.model_copy(
+                    update={"text": local_to_remote_links(note, path_to_remote)}
+                )
+                processed_notes.append(new_note)
+            except HandledBuildError:
+                console.print(f"[yellow]Skipping {note.title} due to broken links[/yellow]")
+                found_error = True
+                continue
+
+        if found_error:
+            console.print(
+                "[yellow]Some notes were skipped due to errors. Fix the issues and rebuild to include them.[/yellow]"
+            )
+
+        return processed_notes
 
     def build_pages(
         self,
@@ -303,13 +342,15 @@ class WebsiteBuilder:
         if not asset.local_preview_path.exists():
             # The image quality, on a scale from 1 (worst) to 95 (best)
             image = Image.open(asset.local_path)
+            # Get the original DPI settings, defaulting to 300 if not set
+            original_dpi = image.info.get("dpi", (300, 300))
             # image.thumbnail((1600, maxsize), Resampling.LANCZOS)
             image.thumbnail((3200, maxsize), Resampling.LANCZOS)
             # image.save(preview_image_path, "JPEG", quality=95, dpi=(300, 300), subsampling=0)
             image.save(
                 asset.local_preview_path,
                 quality=95,
-                dpi=(300, 300),
+                dpi=original_dpi,
                 subsampling=2,  # Corresponds to 4:2:0
                 progressive=True,
             )
@@ -354,8 +395,8 @@ class WebsiteBuilder:
             directions=directions,
         )
 
-    def get_notes(self, notes_path: Path):
-        notes = []
+    def get_notes(self, notes_path: Path) -> list[Note]:
+        notes: list[Note] = []
         found_error = False
 
         # Create a tree for visual display of notes
@@ -393,31 +434,7 @@ class WebsiteBuilder:
         if found_error:
             exit(1)
 
-        # Notes are accessible by both their filename and title
-        path_to_remote = {
-            alias: f"/notes/{note.webpage_path}"
-            for note in notes
-            for alias in [note.filename, note.title]
-        }
-
-        # Process each note's links, skipping those with broken links
-        processed_notes = []
-        for note in notes:
-            try:
-                note.text = local_to_remote_links(note, path_to_remote)
-                processed_notes.append(note)
-            except HandledBuildError:
-                console.print(f"[yellow]Skipping {note.title} due to broken links[/yellow]")
-                found_error = True
-                continue
-
-        if found_error:
-            console.print(
-                "[yellow]Some notes were skipped due to errors. Fix the issues and rebuild to include them.[/yellow]"
-            )
-
-        processed_notes = sorted(processed_notes, key=lambda x: x.metadata.date, reverse=True)
-        return processed_notes
+        return notes
 
     def process_snapshots(self, html_content: str, snapshots_dir: Path, output_dir: Path) -> str:
         """

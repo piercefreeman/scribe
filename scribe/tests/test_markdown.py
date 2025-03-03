@@ -12,6 +12,8 @@ Here are some links:
 - [Escaped Link](https://example.com/\\[escaped\\])
 - Not a [link] and not a (link)
 - \\[Escaped](not-a-link)
+- ![Image](image.jpg)
+- ![Another Image](https://example.com/image.jpg)
 """
     links = MarkdownParser.find_markdown_links(text)
     assert links == [

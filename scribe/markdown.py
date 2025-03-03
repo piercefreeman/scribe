@@ -1,8 +1,5 @@
-from pathlib import Path
 from re import DOTALL, finditer, sub
 from typing import Set, Tuple
-
-from scribe.logging import LOGGER
 
 
 class MarkdownParser:
@@ -12,9 +9,9 @@ class MarkdownParser:
     def find_markdown_links(text: str) -> list[Tuple[str, str]]:
         """
         Find all markdown links in the text that haven't been escaped.
-        Returns a list of tuples (text, url).
+        Returns a list of tuples (text, url). Excludes image links.
         """
-        matches = finditer(r"[^\\]\[(.*?)\]\((.+?)\)", text)
+        matches = finditer(r"[^!\\]\[(.*?)\]\((.+?)\)", text)
         return [(match.group(1), match.group(2)) for match in matches]
 
     @staticmethod
@@ -43,13 +40,6 @@ class MarkdownParser:
         return any(url.startswith(prefix) for prefix in ["http://", "https://", "www."])
 
     @staticmethod
-    def normalize_path(path: str) -> str:
-        """
-        Normalize a path by removing relative path indicators and getting just the filename.
-        """
-        return Path(path.lstrip(".")).name
-
-    @staticmethod
     def extract_referenced_images(text: str) -> Set[str]:
         """
         Find all image paths referenced in the text, either through markdown
@@ -60,13 +50,12 @@ class MarkdownParser:
 
         # Extract paths from markdown matches
         for _, path in parser.find_markdown_images(text):
-            image_paths.add(parser.normalize_path(path))
+            image_paths.add(path)
 
         # Extract paths from HTML matches
         for path in parser.find_html_images(text):
-            image_paths.add(parser.normalize_path(path))
+            image_paths.add(path)
 
-        LOGGER.debug(f"Found referenced images: {image_paths}")
         return image_paths
 
     @staticmethod
