@@ -318,7 +318,10 @@ class WebsiteBuilder:
                 for dpi in asset.resolution_map.keys():
                     dpi_path = asset.get_dpi_path(dpi)
                     if not dpi_path.exists():
+                        # TODO: We should improve our image processing pipeline to downsample these files
+                        # based on image size, not DPI
                         image = Image.open(asset.local_path)
+                        image.thumbnail((3200, maxsize), Resampling.LANCZOS)
                         image.save(
                             dpi_path,
                             quality=95,
