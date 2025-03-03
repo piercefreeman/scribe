@@ -152,8 +152,11 @@ class Note(BaseModel):
 
     def model_copy(self, update: dict) -> "Note":
         # If we are updating the text, we need to recompute the html content
-        if "text" in update:
-            update["html_content"] = self.compute_html_content(update["text"], self.metadata)
+        if "text" in update or "metadata" in update or "assets" in update:
+            text = update.get("text", self.text)
+            metadata = update.get("metadata", self.metadata)
+            assets = update.get("assets", self.assets)
+            update["html_content"] = self.compute_html_content(text, metadata, assets)
 
         return super().model_copy(update=update)
 
@@ -256,11 +259,13 @@ class Note(BaseModel):
         Compute the HTML content for this note. This is done lazily since HTML generation
         can be expensive and may not always be needed.
         """
-        values["html_content"] = cls.compute_html_content(values["text"], values["metadata"])
+        values["html_content"] = cls.compute_html_content(
+            values["text"], values["metadata"], values.get("assets", [])
+        )
         return values
 
     @classmethod
-    def compute_html_content(cls, text: str, metadata: NoteMetadata) -> str:
+    def compute_html_content(cls, text: str, metadata: NoteMetadata, assets: list[Asset]) -> str:
         html = markdown(
             text,
             extensions=[
@@ -285,5 +290,20 @@ class Note(BaseModel):
                 image_classes.append("small-image")
 
             img["class"] = " ".join(image_classes)
+
+            # Add srcset if the image has DPI variants
+            src = img.get("src", "")
+            if src:
+                # Find the corresponding asset
+                for asset in assets:
+                    if src.endswith(asset.remote_preview_path):
+                        if asset.resolution_map:
+                            srcset_parts = []
+                            for dpi, descriptor in asset.resolution_map.items():
+                                srcset_parts.append(
+                                    f"{asset.get_remote_dpi_path(dpi)} {descriptor}"
+                                )
+                            img["srcset"] = ", ".join(srcset_parts)
+                            break
 
         return str(content)

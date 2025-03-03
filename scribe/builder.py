@@ -16,6 +16,7 @@ from PIL.Image import Resampling
 from rich.console import Console
 from rich.tree import Tree
 
+from scribe.asset import WEB_DPI
 from scribe.exceptions import HandledBuildError
 from scribe.io import get_asset_path
 from scribe.links import local_to_remote_links
@@ -96,8 +97,9 @@ class WebsiteBuilder:
 
             # Add snapshot metadata to the note html
             console.print("[blue]Building note text[/blue]")
-            processed_notes = self.build_links(processed_notes)
-            processed_notes = self.build_snapshots(processed_notes, snapshots_dir, output_path)
+            processed_notes = self.process_links(processed_notes)
+            processed_notes = self.process_snapshots(processed_notes, snapshots_dir, output_path)
+            processed_notes = self.process_assets(processed_notes, output_path)
 
             # When developing locally it's nice to preview draft notes on the homepage as they will look live
             # But require this as an explicit env variable
@@ -175,11 +177,6 @@ class WebsiteBuilder:
             if not self.build_state.needs_rebuild(note.path):
                 continue
 
-            # Format the images / media associated with this note
-            LOGGER.info(f"Processing assets for {note.title}: {len(note.assets)}")
-            for asset in note.assets:
-                self.process_asset(asset, output_path=output_path)
-
             console.print(f"[yellow]Building {note.title}[/yellow]")
 
             possible_note_paths = list(
@@ -217,14 +214,14 @@ class WebsiteBuilder:
             if note.path is not None:
                 self.build_state.mark_built(note.path)
 
-    def build_snapshots(self, notes: list[Note], snapshots_dir: Path, output_path: Path):
+    def process_snapshots(self, notes: list[Note], snapshots_dir: Path, output_path: Path):
         # Process each note
         processed_notes: list[Note] = []
         for note in notes:
             try:
                 # Process snapshots if they exist
                 html_content = (
-                    self.process_snapshots(note.html_content, snapshots_dir, output_path)
+                    self._handle_snapshot(note.html_content, snapshots_dir, output_path)
                     if snapshots_dir.exists()
                     else note.html_content
                 )
@@ -242,7 +239,7 @@ class WebsiteBuilder:
 
         return processed_notes
 
-    def build_links(self, notes: list[Note]):
+    def process_links(self, notes: list[Note]):
         # Notes are accessible by both their filename and title
         path_to_remote = {
             alias: f"/notes/{note.webpage_path}"
@@ -271,6 +268,94 @@ class WebsiteBuilder:
 
         return processed_notes
 
+    def process_assets(self, notes: list[Note], output_path: Path):
+        processed_notes: list[Note] = []
+
+        for note in notes:
+            processed_assets: list[Asset] = []
+
+            for asset in note.assets:
+                LOGGER.info(f"\nProcessing asset: {asset.local_path}")
+                LOGGER.info(f"Output path: {output_path}")
+
+                # Skip if already processed
+                if not self.build_state.needs_rebuild(asset.local_path):
+                    LOGGER.info(f"Asset already processed: {asset.local_path}")
+                    processed_assets.append(asset)
+                    continue
+
+                # Create resolution map based on DPI
+                with Image.open(asset.local_path) as img:
+                    dpi = img.info.get("dpi", (WEB_DPI, WEB_DPI))[0]  # Get horizontal DPI
+
+                    resolution_map = {}
+                    if dpi > WEB_DPI:
+                        # Round DPI to nearest integer to avoid float key issues
+                        dpi_int = round(dpi)
+                        resolution_map = {WEB_DPI: "1x", dpi_int: f"{dpi_int / WEB_DPI:.1f}x"}
+
+                    # Update the asset with the resolution map
+                    asset = asset.model_copy(update={"resolution_map": resolution_map})
+                    LOGGER.info(f"Asset resolution map: {asset.resolution_map}")
+
+                # Don't process preview files separately, process as part of their main asset package
+                # Compress the assets if we don't already have a compressed version
+                if not asset.local_preview_path.exists():
+                    # Create preview image - always at standard DPI
+                    image = Image.open(asset.local_path)
+                    image.thumbnail((3200, maxsize), Resampling.LANCZOS)
+                    image.save(
+                        asset.local_preview_path,
+                        quality=95,
+                        dpi=(72, 72),  # Always save preview at standard DPI
+                        subsampling=2,  # Corresponds to 4:2:0
+                        progressive=True,
+                    )
+                    LOGGER.info("Preview image created successfully")
+
+                # Create DPI variants based on the resolution map
+                for dpi in asset.resolution_map.keys():
+                    dpi_path = asset.get_dpi_path(dpi)
+                    if not dpi_path.exists():
+                        image = Image.open(asset.local_path)
+                        image.save(
+                            dpi_path,
+                            quality=95,
+                            dpi=(dpi, dpi),
+                            subsampling=2,
+                            progressive=True,
+                        )
+                        LOGGER.info(f"{dpi} DPI version created successfully")
+
+                # Copy the preview image
+                remote_path = output_path / f"./{asset.remote_preview_path}"
+                if not remote_path.exists():
+                    copyfile(asset.local_preview_path, remote_path)
+
+                # Copy the raw
+                remote_path = output_path / f"./{asset.remote_path}"
+                if not remote_path.exists():
+                    copyfile(asset.local_path, remote_path)
+
+                # Copy DPI variants if they exist
+                for dpi in asset.resolution_map.keys():
+                    local_dpi_path = asset.get_dpi_path(dpi)
+                    if local_dpi_path.exists():
+                        remote_dpi_path = output_path / f"./{asset.get_remote_dpi_path(dpi)}"
+                        if not remote_dpi_path.exists():
+                            copyfile(local_dpi_path, remote_dpi_path)
+
+                # Mark as successfully processed
+                self.build_state.mark_built(asset.local_path)
+                processed_assets.append(asset)
+                LOGGER.info(f"Asset processing complete: {asset.local_path}\n")
+
+            # Update the note with the processed assets
+            new_note = note.model_copy(update={"assets": processed_assets})
+            processed_notes.append(new_note)
+
+        return processed_notes
+
     def build_pages(
         self,
         pages: list[PageDefinition],
@@ -283,7 +368,7 @@ class WebsiteBuilder:
 
             template = self.env.get_template(page.template)
             page_args = page.page_args or TemplateArguments()
-            page_args = self.augment_page_directions(page_args)
+            page_args = self._augment_page_directions(page_args)
 
             with open(output_path / page.url, "w") as file:
                 file.write(template.render(**asdict(page_args), build_metadata=build_metadata))
@@ -328,73 +413,6 @@ class WebsiteBuilder:
                 offset=offset,
             )
 
-    def process_asset(self, asset: Asset, output_path: Path):
-        LOGGER.info(f"\nProcessing asset: {asset.local_path}")
-        LOGGER.info(f"Output path: {output_path}")
-
-        # Skip if already processed
-        if not self.build_state.needs_rebuild(asset.local_path):
-            LOGGER.info(f"Asset already processed: {asset.local_path}")
-            return
-
-        # Don't process preview files separately, process as part of their main asset package
-        # Compress the assets if we don't already have a compressed version
-        if not asset.local_preview_path.exists():
-            # The image quality, on a scale from 1 (worst) to 95 (best)
-            image = Image.open(asset.local_path)
-            # Get the original DPI settings, defaulting to 300 if not set
-            original_dpi = image.info.get("dpi", (300, 300))
-            # image.thumbnail((1600, maxsize), Resampling.LANCZOS)
-            image.thumbnail((3200, maxsize), Resampling.LANCZOS)
-            # image.save(preview_image_path, "JPEG", quality=95, dpi=(300, 300), subsampling=0)
-            image.save(
-                asset.local_preview_path,
-                quality=95,
-                dpi=original_dpi,
-                subsampling=2,  # Corresponds to 4:2:0
-                progressive=True,
-            )
-            LOGGER.info("Preview image created successfully")
-
-        # Copy the preview image
-        # Use a relative path to make sure we place it correctly in the output path
-        remote_path = output_path / f"./{asset.remote_preview_path}"
-        if not remote_path.exists():
-            copyfile(asset.local_preview_path, remote_path)
-
-        # Copy the raw
-        remote_path = output_path / f"./{asset.remote_path}"
-        if not remote_path.exists():
-            copyfile(asset.local_path, remote_path)
-
-        # Mark as successfully processed
-        self.build_state.mark_built(asset.local_path)
-        LOGGER.info(f"Asset processing complete: {asset.local_path}\n")
-
-    def augment_page_directions(self, arguments: TemplateArguments):
-        """
-        Use the metadata in a TemplateArgument to determine if there are additional
-        pages in the sequence.
-
-        """
-        if arguments.offset is None or arguments.limit is None:
-            return arguments
-
-        note_count = len(arguments.notes) if arguments.notes else 0
-
-        page_index = arguments.offset // arguments.limit
-        has_next = arguments.offset + arguments.limit < note_count
-        has_previous = page_index > 0
-
-        directions = []
-        directions += [PageDirection("previous", page_index - 1)] if has_previous else []
-        directions += [PageDirection("next", page_index + 1)] if has_next else []
-
-        return replace(
-            arguments,
-            directions=directions,
-        )
-
     def get_notes(self, notes_path: Path) -> list[Note]:
         notes: list[Note] = []
         found_error = False
@@ -436,7 +454,31 @@ class WebsiteBuilder:
 
         return notes
 
-    def process_snapshots(self, html_content: str, snapshots_dir: Path, output_dir: Path) -> str:
+    def _augment_page_directions(self, arguments: TemplateArguments):
+        """
+        Use the metadata in a TemplateArgument to determine if there are additional
+        pages in the sequence.
+
+        """
+        if arguments.offset is None or arguments.limit is None:
+            return arguments
+
+        note_count = len(arguments.notes) if arguments.notes else 0
+
+        page_index = arguments.offset // arguments.limit
+        has_next = arguments.offset + arguments.limit < note_count
+        has_previous = page_index > 0
+
+        directions = []
+        directions += [PageDirection("previous", page_index - 1)] if has_previous else []
+        directions += [PageDirection("next", page_index + 1)] if has_next else []
+
+        return replace(
+            arguments,
+            directions=directions,
+        )
+
+    def _handle_snapshot(self, html_content: str, snapshots_dir: Path, output_dir: Path) -> str:
         """
         Process HTML content to:
         1. Find all external links

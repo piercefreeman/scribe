@@ -70,7 +70,6 @@
 
   .small-image {
     @apply shadow-lg border-white dark:border-gray-900 dark:shadow-gray-700/20 dark:border-0 border-4 rounded-lg;
-    @apply lg:max-w-[100vw] lg:w-[calc(100%+50px)] xl:w-[calc(100%+75px)];
-    @apply transform lg:-translate-x-[25px] xl:-translate-x-[37.5px];
+    @apply mx-auto;
   }
 }
