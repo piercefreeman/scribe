@@ -315,7 +315,7 @@ class Note(BaseModel):
             if is_screenshot:
                 # Create a wrapper div for the screenshot with Sonoma background
                 wrapper_div = content.new_tag("div")
-                wrapper_div["class"] = "relative w-full px-6 py-4 bg-cover bg-center small-image"
+                wrapper_div["class"] = "relative px-6 py-4 bg-cover bg-center screenshot"
                 wrapper_div["style"] = "background-image: url('/desktops/sonoma.jpg')"
 
                 # Create an inner div for centering the screenshot

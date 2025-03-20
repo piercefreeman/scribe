@@ -24,6 +24,8 @@
                             </div>
                         {% endif %}
                     </article>
+
+                    {% include "subscribe.html" %}
                 </div>
                 <div class="{% if has_footnotes %}lg:block lg:grow{% endif %} relative hidden"
                      id="footnotes-inline">
@@ -63,7 +65,6 @@
                 {% endfor %}
             </div>
         </div>
-        {% include "subscribe.html" %}
         <script type="text/javascript">
     const contentRaw = document.getElementById("content-raw");
     const footnotes = document.getElementById("footnotes-inline");
