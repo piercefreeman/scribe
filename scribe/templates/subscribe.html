@@ -1,46 +1,84 @@
-<div class="sm:max-w-2xl md:max-w-3xl md:px-8 lg:max-w-4xl lg:px-0 xl:max-w-5xl">
-    <div class="bg-gray-50 px-4 py-8 dark:bg-white/10 border border-gray-200 dark:border-white/25 rounded-2xl m-8">
-        <div class="mx-auto sm:max-w-2xl">
-            <div class="text-sml text-gray-800 dark:text-gray-100">
-                <h2 class="text-xl font-bold tracking-tight">Hi, I'm Pierce</h2>
-                <p class="mt-4">
-                    I write mostly about engineering, machine learning, and
-                    company building. If you want to get updated about longer
-                    essays, subscribe here.
-                </p>
-                <p class="mt-4">
-                    I hate spam so I keep these infrequent - once or twice a
-                    month, maximum.
-                </p>
+<div class="mt-12 mb-8 mx-auto sm:max-w-xl md:max-w-xl bg-gray-50 px-12 py-8 dark:bg-zinc-800 shadow-2xl border border-gray-200 dark:border-white/5 rounded-2xl">
+    <div class="text-center">
+        <div class="text-sm text-gray-800 dark:text-gray-100">
+            <h2 class="text-4xl font-bold tracking-tight">
+                <span id="waving-hand" class="inline-block">👋🏼</span>
+            </h2>
+            <p class="mt-4">
+                Hey, I'm Pierce! I write mostly about engineering, machine learning, and
+                building companies. If you want to get updated about longer
+                essays, subscribe here.
+            </p>
+            <p class="mt-4">
+                I hate spam so I keep these infrequent - once or twice a
+                month maximum. Promise.
+            </p>
+        </div>
+        <form id="newsletter-form">
+            <div class="mt-4 flex gap-x-4">
+                <label htmlFor="email-address" class="sr-only">Email address</label>
+                <input id="email-address"
+                        name="email_address"
+                        type="email"
+                        autocomplete="email"
+                        required
+                        class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-gray-800    git push --set-upstream origin feature/less-padding-on-mobile
+                        shadow-xs ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 dark:text-gray-100 dark:ring-inset dark:ring-gray-300 dark:focus:ring-indigo-500"
+                        placeholder="Type your email..." />
+                <button type="submit"
+                        class="flex-none cursor-pointer rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">
+                    Subscribe
+                </button>
             </div>
-            <form id="newsletter-form">
-                <div class="mt-4 flex gap-x-4">
-                    <label htmlFor="email-address" class="sr-only">Email address</label>
-                    <input id="email-address"
-                           name="email_address"
-                           type="email"
-                           autocomplete="email"
-                           required
-                           class="min-w-0 flex-auto rounded-md border-0 bg-white/5 px-3.5 py-2 text-gray-800 shadow-xs ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 dark:text-gray-100 dark:ring-inset dark:ring-gray-300 dark:focus:ring-indigo-500"
-                           placeholder="Type your email..." />
-                    <button type="submit"
-                            class="flex-none rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">
-                        Subscribe
-                    </button>
-                </div>
-            </form>
-            <div id="form-result" class="mt-4 hidden">
-                <div id="form-success" class="text-green-600"></div>
-                <div id="form-error" class="text-red-600"></div>
-            </div>
+        </form>
+        <div id="form-result" class="mt-4 hidden">
+            <div id="form-success" class="text-green-600"></div>
+            <div id="form-error" class="text-red-600"></div>
         </div>
     </div>
 </div>
+
+<style>
+@keyframes wave {
+    0% { transform: rotate(0deg); }
+    10% { transform: rotate(14deg); }
+    20% { transform: rotate(-8deg); }
+    30% { transform: rotate(14deg); }
+    40% { transform: rotate(-4deg); }
+    50% { transform: rotate(10deg); }
+    60% { transform: rotate(0deg); }
+    100% { transform: rotate(0deg); }
+}
+
+.waving {
+    animation: wave 2.5s ease-in-out;
+    transform-origin: 70% 70%;
+}
+</style>
+
 <script type="text/javascript">
     const form = document.getElementById("newsletter-form");
     const formResult = document.getElementById("form-result");
     const formSuccess = document.getElementById("form-success");
     const formError = document.getElementById("form-error");
+    const wavingHand = document.getElementById("waving-hand");
+
+    // Create intersection observer for the waving hand
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                wavingHand.classList.add('waving');
+                // Remove observer after first animation
+                observer.disconnect();
+            }
+        });
+    }, { 
+        threshold: 1.0, // Require full visibility
+        rootMargin: '0px 0px 20px 0px' // Add 20px margin to bottom
+    });
+
+    // Start observing the hand element
+    observer.observe(wavingHand);
 
     function uuidv4() {
         return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(

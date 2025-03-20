@@ -86,7 +86,15 @@ class WebsiteBuilder:
                 return
 
             # Sort notes by date
-            processed_notes = sorted(notes, key=lambda x: x.metadata.date, reverse=True)
+            processed_notes = sorted(
+                notes,
+                key=lambda x: (
+                    # First sort by status (PUBLISHED first, then DRAFT)
+                    x.metadata.status != NoteStatus.PUBLISHED,
+                    # Then by date within each status group
+                    -x.metadata.date.timestamp(),
+                ),
+            )
 
             build_metadata = BuildMetadata()
 

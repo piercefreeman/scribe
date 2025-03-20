@@ -307,12 +307,33 @@ class Note(BaseModel):
         # tag - so tailwind can pick up on them)
         for img in content.find_all("img"):
             image_classes = img.get("class", [])
+            alt_text = img.get("alt", "").lower()
 
-            # Travel specific styling
-            if "travel" in metadata.tags:
-                image_classes.append("large-image")
+            # Check if this is a screenshot by looking at the alt text
+            is_screenshot = "screenshot" in alt_text
+
+            if is_screenshot:
+                # Create a wrapper div for the screenshot with Sonoma background
+                wrapper_div = content.new_tag("div")
+                wrapper_div["class"] = "relative px-6 py-4 bg-cover bg-center screenshot"
+                wrapper_div["style"] = "background-image: url('/desktops/sonoma.jpg')"
+
+                # Create an inner div for centering the screenshot
+                inner_div = content.new_tag("div")
+                inner_div["class"] = "flex justify-center items-center"
+
+                # Move the image into the inner div
+                img.wrap(inner_div)
+                inner_div.wrap(wrapper_div)
+
+                # Add screenshot-specific styling to the image
+                image_classes.extend(["max-w-full", "h-auto rounded-sm"])
             else:
-                image_classes.append("small-image")
+                # Travel specific styling
+                if "travel" in metadata.tags:
+                    image_classes.append("large-image")
+                else:
+                    image_classes.append("small-image")
 
             img["class"] = " ".join(image_classes)
 
