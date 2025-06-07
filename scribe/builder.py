@@ -443,6 +443,7 @@ class WebsiteBuilder:
 
             if path.suffix == ".md":
                 try:
+                    print(f"Processing note: {path}")
                     note = Note.from_file(path)
                     if note.metadata.status in {NoteStatus.DRAFT, NoteStatus.PUBLISHED}:
                         notes.append(note)
