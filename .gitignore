@@ -135,3 +135,6 @@ static
 
 # Scribe backups
 **/.scribe_backups/
+
+.ruff_cache
+.claude

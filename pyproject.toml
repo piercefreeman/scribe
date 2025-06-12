@@ -1,60 +1,112 @@
-[project]
-name = "scribe"
-version = "0.1.0"
-description = "Personal blog generation engine for freeman.vc"
-authors = [
-    { name = "Pierce Freeman", email = "pierce@freeman.vc" }
-]
-license = "MIT"
-requires-python = ">=3.12"
-
-dependencies = [
-    "jinja2>=3.1.2",
-    "click>=8.0.1",
-    "Markdown>=3.4.1",
-    "Pygments>=2.13.0",
-    "pygments-ansi-color>=0.0.6",
-    "fastapi>=0.83.0",
-    "python-dateutil>=2.8.2",
-    "watchfiles>=0.21.0",
-    "beautifulsoup4>=4.11.1",
-    "pillow>=9.2.0",
-    "PyYAML>=6.0.1",
-    "uvicorn>=0.22.0",
-    "rich>=13.7.0",
-    "rapidfuzz>=3.6.1",
-]
-
-[project.scripts]
-scribe = "scribe.cli.cli:main"
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[project]
+name = "scribe"
+dynamic = ["version"]
+description = "A modular static site generator with plugin architecture"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Pierce Freeman" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "click>=8.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "watchfiles>=0.20.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0.0",
+    "markdown>=3.5.0",
+    "python-frontmatter>=1.0.0",
+    "rich>=13.0.0",
+    "jinja2>=3.0.0",
+    "beautifulsoup4>=4.13.4",
+    "pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/piercefreeman/scribe"
+Repository = "https://github.com/piercefreeman/scribe"
+
+[project.scripts]
+scribe = "scribe.cli:main"
+
+[tool.hatch.version]
+path = "scribe/__init__.py"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
 [tool.ruff]
-target-version = "py312"
-line-length = 100
+target-version = "py310"
+line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "B"]
-ignore = ["E501"]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.393",
-    "ruff>=0.9.5",
-    "pytest>=7.3.1",
-    "types-beautifulsoup4>=4.12.0.5",
-    "types-PyYAML>=6.0.12.9",
-    "types-Markdown>=3.4.2.9",
-    "types-python-dateutil>=2.8.19.13",
-    "types-Pillow>=9.5.0.4",
-    "djlint>=1.35.2",
+    "pyright>=1.1.402",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.11.13",
 ]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--tb=short", "--strict-markers"]
 markers = [
-    "integration: marks tests that require external services or are integration tests",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
 ]
-addopts = "-m 'not integration'"
+asyncio_mode = "auto"

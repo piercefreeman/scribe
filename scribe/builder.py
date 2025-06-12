@@ -1,554 +1,566 @@
-from collections import defaultdict
-from dataclasses import asdict, replace
-from hashlib import sha256
-from os import getenv
+"""Core builder for processing markdown files and generating static site."""
+
+import asyncio
+import shutil
+from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
-from random import sample
-from shutil import copy2, copyfile
-from sys import exit, maxsize
-from typing import Set
+from typing import Any
 
-from bs4 import BeautifulSoup
-from click import secho
-from jinja2 import Environment, PackageLoader, select_autoescape
-from PIL import Image
-from PIL.Image import Resampling
+from jinja2 import Environment, FileSystemLoader
 from rich.console import Console
-from rich.tree import Tree
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
-from scribe.asset import WEB_DPI
-from scribe.exceptions import HandledBuildError
-from scribe.io import get_asset_path
-from scribe.links import local_to_remote_links
-from scribe.logging import LOGGER
-from scribe.metadata import BuildMetadata, FeaturedPhotoPosition, NoteStatus
-from scribe.models import PageDefinition, PageDirection, TemplateArguments
-from scribe.note import Asset, Note
-from scribe.parsers import InvalidMetadataError
-from scribe.snapshot import SnapshotMetadata, get_url_hash
-from scribe.template_utilities import filter_tag, group_by_month
+from scribe.build_plugins.manager import BuildPluginManager
+from scribe.config import ScribeConfig
+from scribe.context import PageContext, PageStatus
+from scribe.logger import get_logger
+from scribe.note_plugins import PluginManager
+from scribe.note_plugins.config import (
+    BaseNotePluginConfig,
+    DatePluginConfig,
+    FootnotesPluginConfig,
+    FrontmatterPluginConfig,
+    MarkdownPluginConfig,
+)
+from scribe.predicates import PredicateMatcher
+from scribe.templates import NotesAccessor
 
 console = Console()
+logger = get_logger(__name__)
 
 
-class BuildState:
-    """Tracks which files have been built in the current process"""
+class SiteBuilder:
+    """Main builder class for processing files and generating static site."""
 
-    def __init__(self):
-        # Set of files that have been successfully built
-        self.built_files: Set[str] = set()
+    def __init__(self, config: ScribeConfig) -> None:
+        self.config = config
+        self.plugin_manager = PluginManager(global_config=config)
+        self.build_plugin_manager = BuildPluginManager()
+        self.jinja_env: Environment | None = None
+        self.predicate_matcher = PredicateMatcher()
+        self.predicate_functions: dict[str, Callable[[PageContext], bool]] = {}
+        self.processed_notes: list[PageContext] = []
+        self.build_errors: dict[str, list[str]] = {}  # filename -> list of errors
 
-    def needs_rebuild(self, file_path: Path) -> bool:
-        """Check if a file needs to be rebuilt"""
-        return str(file_path) not in self.built_files
+        self.default_plugins: list[BaseNotePluginConfig] = [
+            FrontmatterPluginConfig(),
+            FootnotesPluginConfig(),
+            MarkdownPluginConfig(),
+            DatePluginConfig(),
+        ]
 
-    def mark_built(self, file_path: Path):
-        """Mark a file as successfully built"""
-        self.built_files.add(str(file_path))
+        self._setup_plugins()
+        self._setup_build_plugins()
+        self._setup_templates()
 
-    def clear(self):
-        """Clear all build state"""
-        self.built_files.clear()
+    def _setup_plugins(self) -> None:
+        """Setup default plugins and load custom plugins from config."""
+        # Combine default plugins with user-configured plugins
+        all_plugins = list(self.default_plugins)
 
+        if self.config.note_plugins:
+            # Add user-configured plugins, avoiding duplicates
+            default_plugin_names = {plugin.name for plugin in self.default_plugins}
 
-class WebsiteBuilder:
-    def __init__(self):
-        self.env = Environment(
-            loader=PackageLoader(__name__.split(".")[0]), autoescape=select_autoescape()
+            # Only add user plugins that don't override defaults
+            for plugin in self.config.note_plugins:
+                if plugin.name in default_plugin_names:
+                    # Replace default plugin with user configuration
+                    all_plugins = [p for p in all_plugins if p.name != plugin.name]
+                all_plugins.append(plugin)
+
+        # Load all plugins together so dependency resolution sees everything
+        self.plugin_manager.load_plugins_from_config(all_plugins)
+
+    def _setup_build_plugins(self) -> None:
+        """Setup build plugins from config."""
+        if self.config.build_plugins:
+            self.build_plugin_manager.load_plugins_from_config(
+                list(self.config.build_plugins)
+            )
+
+    def _setup_templates(self) -> None:
+        """Setup Jinja2 template environment if templates are configured."""
+        if not self.config.templates or not self.config.templates.template_path:
+            return
+
+        template_path = self.config.templates.template_path
+        if not template_path.exists():
+            console.print(
+                f"[yellow]Warning: Template directory {template_path} "
+                "does not exist[/yellow]"
+            )
+            return
+
+        self.jinja_env = Environment(
+            loader=FileSystemLoader(str(template_path)), autoescape=True
         )
 
-        self.env.globals["filter_tag"] = filter_tag
-        self.env.globals["group_by_month"] = group_by_month
-        self.env.globals["FeaturedPhotoPosition"] = FeaturedPhotoPosition
+        # Setup predicate functions from the predicate matcher
+        self.predicate_functions = self.predicate_matcher.predicate_functions
 
-        # Initialize build state
-        self.build_state = BuildState()
+    async def build_site(self, force_rebuild: bool = False) -> None:
+        """Build the entire site."""
+        if self.config.clean_output and self.config.output_dir.exists():
+            shutil.rmtree(self.config.output_dir)
 
-    def build(self, notes_path: str | Path, output_path: str | Path) -> None:
-        """
-        Build the website from markdown notes.
+        self.config.output_dir.mkdir(parents=True, exist_ok=True)
 
-        Args:
-            notes_path: Path to the notes directory
-            output_path: Path to the output directory
-        """
+        # Clear processed notes cache and error tracking
+        self.processed_notes.clear()
+        self.build_errors.clear()
+
+        # Find all markdown files
+        markdown_files = self._find_markdown_files()
+
+        # Process files concurrently (just processing, not writing output yet)
+        tasks = [
+            self._process_file_content(file_path, force_rebuild)
+            for file_path in markdown_files
+        ]
+
+        results = await self._process_files_with_progress(tasks)
+
+        # Collect processed notes (filter out None results)
+        self.processed_notes = [ctx for ctx in results if ctx is not None]
+
+        # Generate output based on note templates
+        await self._generate_outputs_from_templates(force_rebuild)
+
+        # Build base templates if configured
+        await self._build_base_templates()
+
+        # Copy static files if configured
+        await self._copy_static_files()
+
+        # Execute build plugins
+        await self.build_plugin_manager.execute_plugins(
+            self.config, self.config.output_dir
+        )
+
+        # Copy snapshot outputs after all processing is complete
+        self.plugin_manager.copy_snapshot_outputs(self.config.output_dir)
+
+        # Report any validation errors that occurred during the build
+        self._report_build_errors()
+
+    async def build_file(self, file_path: Path) -> PageContext | None:
+        """Build a single file and return its context."""
+        # Process the file content
+        ctx = await self._process_file_content(file_path, force_rebuild=True)
+        if ctx is None:
+            return None
+
+        # Generate output if it matches any template
+        await self._generate_output_for_note(ctx, force_rebuild=True)
+        return ctx
+
+    def _find_markdown_files(self) -> list[Path]:
+        """Find all markdown files in the source directory."""
+        if not self.config.source_dir.exists():
+            return []
+
+        markdown_files = []
+        for pattern in ["*.md", "*.markdown"]:
+            markdown_files.extend(self.config.source_dir.rglob(pattern))
+
+        return markdown_files
+
+    async def _process_file_content(
+        self, file_path: Path, force_rebuild: bool = False
+    ) -> PageContext | None:
+        """Process a single markdown file content through plugins."""
         try:
-            notes_path = Path(notes_path).expanduser()
-            output_path = Path(output_path).expanduser()
-            snapshots_dir = notes_path / "snapshots"
+            # Check if file needs rebuilding
+            if not force_rebuild and not self._needs_rebuild(file_path):
+                return None
 
-            output_path.mkdir(exist_ok=True)
-
-            # Get all notes
-            notes = self.get_notes(notes_path)
-            if not notes:
-                secho("No notes found", fg="yellow")
-                return
-
-            # Sort notes by date
-            processed_notes = sorted(
-                notes,
-                key=lambda x: (
-                    # First sort by status (PUBLISHED first, then DRAFT)
-                    x.metadata.status != NoteStatus.PUBLISHED,
-                    # Then by date within each status group
-                    -x.metadata.date.timestamp(),
-                ),
+            logger.info(
+                f"Processing note: {file_path.relative_to(self.config.source_dir)}"
             )
 
-            build_metadata = BuildMetadata()
+            # Create page context
+            ctx = self._create_page_context(file_path)
 
-            # The static build phase will inject the stylesheet hashes that will be used
-            # for cache invalidation in subsequent pages
-            console.print("[blue]Building static assets[/blue]")
-            self.build_static(output_path, build_metadata)
+            # Process through plugins
+            try:
+                ctx = await self.plugin_manager.process_page(ctx)
+            except Exception as e:
+                self.build_errors[str(file_path)] = [f"Plugin error: {e}"]
+                return None
 
-            # Add snapshot metadata to the note html
-            console.print("[blue]Building note text[/blue]")
-            processed_notes = self.process_links(processed_notes)
-            processed_notes = self.process_snapshots(processed_notes, snapshots_dir, output_path)
-            processed_notes = self.process_assets(processed_notes, output_path)
+            # Update output path based on matching note template URL pattern
+            self._update_output_path_from_template(ctx)
 
-            # When developing locally it's nice to preview draft notes on the homepage as they will look live
-            # But require this as an explicit env variable
-            if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
-                published_notes = processed_notes
-            else:
-                published_notes = [
-                    note for note in processed_notes if note.metadata.status == NoteStatus.PUBLISHED
-                ]
-
-            # Build all notes that are either in draft form or published. Draft notes require a unique
-            # URL to access them but should be displayed publically
-            console.print("[blue]Building notes[/blue]")
-            self.build_notes(processed_notes, output_path, build_metadata)
-
-            console.print("[blue]Building pages[/blue]")
-            self.build_pages(
-                [
-                    PageDefinition(
-                        "home.html", "index.html", TemplateArguments(notes=published_notes)
-                    ),
-                    PageDefinition("rss.xml", "rss.xml", TemplateArguments(notes=published_notes)),
-                    PageDefinition(
-                        "travel.html",
-                        "travel.html",
-                        TemplateArguments(notes=filter_tag(published_notes, "travel")),
-                    ),
-                    PageDefinition(
-                        "projects.html",
-                        "projects.html",
-                    ),
-                    PageDefinition("about.html", "about.html"),
-                ],
-                output_path,
-                build_metadata,
-            )
+            # Always return context for notes collection
+            return ctx
 
         except Exception as e:
-            console.print(f"[red]Build failed:[/red] {str(e)}")
-            raise HandledBuildError() from e
+            console.print(f"[red]Error processing {file_path}:[/red] {e}")
+            # Also track this as a build error
+            file_key = str(file_path.relative_to(self.config.source_dir))
+            self.build_errors[file_key] = [f"Processing error: {e}"]
+            return None
 
-    def build_notes(self, notes: list[Note], output_path: Path, build_metadata: BuildMetadata):
-        # When developing locally it's nice to preview draft notes on the homepage as they will look live
-        # But require this as an explicit env variable
-        if getenv("SCRIBE_ENVIRONMENT") == "DEVELOPMENT":
-            published_notes = notes
-        else:
-            published_notes = [
-                note for note in notes if note.metadata.status == NoteStatus.PUBLISHED
-            ]
+    async def _process_files_with_progress(
+        self, tasks: list
+    ) -> list[PageContext | None]:
+        """Process files concurrently with a progress bar."""
+        if not tasks:
+            return []
 
-        # Pre-build the notes directory
-        notes_path = output_path / "notes"
-        notes_path.mkdir(exist_ok=True)
-        assets_path = output_path / "images"
-        assets_path.mkdir(exist_ok=True)
-
-        # For each tag, sample related posts (up to 3 total)
-        notes_by_tag = defaultdict(list)
-        for note in published_notes:
-            for tag in note.metadata.tags:
-                notes_by_tag[tag.lower()].append(note)
-
-        # Build the posts
-        post_template_paths = ["post.html", "post-travel.html"]
-        post_templates = {path: self.env.get_template(path) for path in post_template_paths}
-        for note in notes:
-            output_file = notes_path / f"{note.webpage_path}.html"
-
-            # Skip if already built and source hasn't changed
-            if not note.path:
-                console.print(f"[yellow]Skipping {note.title} due to missing path[/yellow]")
-                continue
-
-            if not self.build_state.needs_rebuild(note.path):
-                continue
-
-            console.print(f"[yellow]Building {note.title}[/yellow]")
-
-            possible_note_paths = list(
-                {
-                    candidate_note.path
-                    for tag, all_notes in notes_by_tag.items()
-                    for candidate_note in all_notes
-                    if tag in note.metadata.tags
-                    and candidate_note != note
-                    and not note.metadata.external_link
-                }
-            )
-            possible_notes = [note for note in published_notes if note.path in possible_note_paths]
-            relevant_notes = sample(possible_notes, min(3, len(possible_notes)))
-
-            # Conditional post template based on tags
-            post_template_path = "post.html"
-            if "travel" in note.metadata.tags:
-                post_template_path = "post-travel.html"
-            post_template = post_templates[post_template_path]
-
-            with open(output_file, "w") as file:
-                file.write(
-                    post_template.render(
-                        header=note.title,
-                        metadata=note.metadata,
-                        content=note.html_content,
-                        has_footnotes=note.has_footnotes(),
-                        build_metadata=build_metadata,
-                        relevant_notes=relevant_notes,
-                    )
-                )
-
-            # Mark as successfully built
-            if note.path is not None:
-                self.build_state.mark_built(note.path)
-
-    def process_snapshots(self, notes: list[Note], snapshots_dir: Path, output_path: Path):
-        # Process each note
-        processed_notes: list[Note] = []
-        for note in notes:
-            try:
-                # Process snapshots if they exist
-                new_note = (
-                    self._handle_snapshot(note, snapshots_dir, output_path)
-                    if snapshots_dir.exists()
-                    else note
-                )
-
-                # Save the processed note with the modified HTML
-                processed_notes.append(new_note)
-            except InvalidMetadataError as e:
-                console.print(f"[red]Invalid metadata in {note.path}:[/red] {str(e)}")
-                exit(1)
-            except Exception as e:
-                console.print(f"[red]Error processing {note.path}:[/red] {str(e)}")
-                raise HandledBuildError() from e
-
-        return processed_notes
-
-    def process_links(self, notes: list[Note]):
-        # Notes are accessible by both their filename and title
-        path_to_remote = {
-            alias: f"/notes/{note.webpage_path}"
-            for note in notes
-            for alias in [note.filename, note.title]
-        }
-
-        # Process each note's links, skipping those with broken links
-        processed_notes: list[Note] = []
-        found_error = False
-        for note in notes:
-            try:
-                new_note = note.model_copy(
-                    update={"text": local_to_remote_links(note, path_to_remote)}
-                )
-                processed_notes.append(new_note)
-            except HandledBuildError:
-                console.print(f"[yellow]Skipping {note.title} due to broken links[/yellow]")
-                found_error = True
-                continue
-
-        if found_error:
-            console.print(
-                "[yellow]Some notes were skipped due to errors. Fix the issues and rebuild to include them.[/yellow]"
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console,
+            transient=False,
+        ) as progress:
+            task_id = progress.add_task(
+                f"Processing {len(tasks)} files...", total=len(tasks)
             )
 
-        return processed_notes
+            results = []
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
+                results.append(result)
+                progress.advance(task_id)
 
-    def process_assets(self, notes: list[Note], output_path: Path):
-        processed_notes: list[Note] = []
+            return results
 
-        for note in notes:
-            processed_assets: list[Asset] = []
+    def _create_page_context(self, file_path: Path) -> PageContext:
+        """Create a page context for a markdown file."""
+        # Read file content
+        content = file_path.read_text(encoding="utf-8")
 
-            for asset in note.assets:
-                LOGGER.info(f"\nProcessing asset: {asset.local_path}")
-                LOGGER.info(f"Output path: {output_path}")
+        # Calculate relative path from source directory
+        relative_path = file_path.relative_to(self.config.source_dir)
 
-                # Skip if already processed
-                if not self.build_state.needs_rebuild(asset.local_path):
-                    LOGGER.info(f"Asset already processed: {asset.local_path}")
-                    processed_assets.append(asset)
-                    continue
+        # Calculate output path (replace .md with .html)
+        output_relative = relative_path.with_suffix(".html")
+        output_path = self.config.output_dir / output_relative
 
-                # Create resolution map based on DPI
-                with Image.open(asset.local_path) as img:
-                    dpi = img.info.get("dpi", (WEB_DPI, WEB_DPI))[0]  # Get horizontal DPI
+        # Get file modification time
+        modified_time = file_path.stat().st_mtime
 
-                    resolution_map = {}
-                    if dpi > WEB_DPI:
-                        # Round DPI to nearest integer to avoid float key issues
-                        dpi_int = round(dpi)
-                        resolution_map = {WEB_DPI: "1x", dpi_int: f"{dpi_int / WEB_DPI:.1f}x"}
-
-                    # Update the asset with the resolution map
-                    asset = asset.model_copy(update={"resolution_map": resolution_map})
-                    LOGGER.info(f"Asset resolution map: {asset.resolution_map}")
-
-                # Ensure the cache directory exists
-                asset.cache_dir.mkdir(parents=True, exist_ok=True)
-
-                # Don't process preview files separately, process as part of their main asset package
-                # Compress the assets if we don't already have a compressed version
-                if not asset.local_preview_path.exists():
-                    # Create preview image - always at standard DPI
-                    image = Image.open(asset.local_path)
-                    image.thumbnail((3200, maxsize), Resampling.LANCZOS)
-                    image.save(
-                        asset.local_preview_path,
-                        quality=95,
-                        dpi=(72, 72),  # Always save preview at standard DPI
-                        subsampling=2,  # Corresponds to 4:2:0
-                        progressive=True,
-                    )
-                    LOGGER.info("Preview image created successfully")
-
-                # Create DPI variants based on the resolution map
-                for dpi in asset.resolution_map.keys():
-                    dpi_path = asset.get_dpi_path(dpi)
-                    if not dpi_path.exists():
-                        # TODO: We should improve our image processing pipeline to downsample these files
-                        # based on image size, not DPI
-                        image = Image.open(asset.local_path)
-                        image.thumbnail((3200, maxsize), Resampling.LANCZOS)
-                        image.save(
-                            dpi_path,
-                            quality=95,
-                            dpi=(dpi, dpi),
-                            subsampling=2,
-                            progressive=True,
-                        )
-                        LOGGER.info(f"{dpi} DPI version created successfully")
-
-                # Copy the preview image
-                remote_path = output_path / f"./{asset.remote_preview_path}"
-                remote_path.parent.mkdir(parents=True, exist_ok=True)
-                if not remote_path.exists():
-                    copyfile(asset.local_preview_path, remote_path)
-
-                # Copy the raw
-                remote_path = output_path / f"./{asset.remote_path}"
-                remote_path.parent.mkdir(parents=True, exist_ok=True)
-                if not remote_path.exists():
-                    copyfile(asset.local_path, remote_path)
-
-                # Copy DPI variants if they exist
-                for dpi in asset.resolution_map.keys():
-                    local_dpi_path = asset.get_dpi_path(dpi)
-                    if local_dpi_path.exists():
-                        remote_dpi_path = output_path / f"./{asset.get_remote_dpi_path(dpi)}"
-                        remote_dpi_path.parent.mkdir(parents=True, exist_ok=True)
-                        if not remote_dpi_path.exists():
-                            copyfile(local_dpi_path, remote_dpi_path)
-
-                # Mark as successfully processed
-                self.build_state.mark_built(asset.local_path)
-                processed_assets.append(asset)
-                LOGGER.info(f"Asset processing complete: {asset.local_path}\n")
-
-            # Update the note with the processed assets
-            new_note = note.model_copy(update={"assets": processed_assets})
-            processed_notes.append(new_note)
-
-        return processed_notes
-
-    def build_pages(
-        self,
-        pages: list[PageDefinition],
-        output_path: Path,
-        build_metadata: BuildMetadata,
-    ):
-        # Build pages
-        for page in pages:
-            secho(f"Processing: {page.template} -> {page.url}")
-
-            template = self.env.get_template(page.template)
-            page_args = page.page_args or TemplateArguments()
-            page_args = self._augment_page_directions(page_args)
-
-            with open(output_path / page.url, "w") as file:
-                file.write(template.render(**asdict(page_args), build_metadata=build_metadata))
-
-    def build_rss(self, notes, output_path):
-        # Limit to just published notes
-        notes = [note for note in notes if note.metadata.status == NoteStatus.PUBLISHED]
-
-        # Build RSS feed
-        rss_template = self.env.get_template("rss.xml")
-        with open(output_path / "rss.xml", "w") as file:
-            file.write(
-                rss_template.render(
-                    notes=notes,
-                )
-            )
-
-    def build_static(self, output_path: Path, build_metadata: BuildMetadata):
-        # Build static
-        static_path = get_asset_path("resources")
-        for path in static_path.glob("**/*"):
-            if not path.is_file():
-                continue
-            root_relative = path.relative_to(static_path)
-            file_output = output_path / root_relative
-            file_output.parent.mkdir(exist_ok=True)
-            copyfile(path, file_output)
-
-        # Attempt to locate the built style and code paths
-        style_path = static_path / "style.css"
-        code_path = static_path / "code.css"
-        if style_path.exists():
-            build_metadata.style_hash = sha256(style_path.read_text().encode()).hexdigest()
-        if code_path.exists():
-            build_metadata.code_hash = sha256(code_path.read_text().encode()).hexdigest()
-
-    def get_paginated_arguments(self, notes: list[Note], limit: int):
-        for offset in range(0, len(notes), limit):
-            yield TemplateArguments(
-                notes=notes,
-                limit=limit,
-                offset=offset,
-            )
-
-    def get_notes(self, notes_path: Path) -> list[Note]:
-        notes: list[Note] = []
-        found_error = False
-
-        # Create a tree for visual display of notes
-        tree = Tree("Current Notes")
-        folders: dict[str, Tree] = {}
-
-        for path in notes_path.rglob("*"):
-            # Skip hidden directories (those starting with .)
-            if any(part.startswith(".") for part in path.parts):
-                continue
-
-            if path.suffix == ".md":
-                try:
-                    note = Note.from_file(path)
-                    if note.metadata.status in {NoteStatus.DRAFT, NoteStatus.PUBLISHED}:
-                        notes.append(note)
-
-                        # Add to the tree visualization
-                        relative_path = path.relative_to(notes_path)
-                        parent_path = str(relative_path.parent)
-                        if parent_path == ".":
-                            tree.add(f"[blue]→[/blue] {note.title}")
-                        else:
-                            if parent_path not in folders:
-                                folders[parent_path] = tree.add(f"/{parent_path}")
-                            folders[parent_path].add(f"[blue]→[/blue] {note.title}")
-
-                except InvalidMetadataError as e:
-                    console.print(f"[red]Invalid metadata: {path}: {e}[/red]")
-                    found_error = True
-
-        # Display the tree
-        console.print(tree)
-
-        if found_error:
-            exit(1)
-
-        return notes
-
-    def _augment_page_directions(self, arguments: TemplateArguments):
-        """
-        Use the metadata in a TemplateArgument to determine if there are additional
-        pages in the sequence.
-
-        """
-        if arguments.offset is None or arguments.limit is None:
-            return arguments
-
-        note_count = len(arguments.notes) if arguments.notes else 0
-
-        page_index = arguments.offset // arguments.limit
-        has_next = arguments.offset + arguments.limit < note_count
-        has_previous = page_index > 0
-
-        directions = []
-        directions += [PageDirection("previous", page_index - 1)] if has_previous else []
-        directions += [PageDirection("next", page_index + 1)] if has_next else []
-
-        return replace(
-            arguments,
-            directions=directions,
+        return PageContext(
+            source_path=file_path,
+            relative_path=relative_path,
+            output_path=output_path,
+            raw_content=content,
+            modified_time=modified_time,
         )
 
-    def _handle_snapshot(self, note: Note, snapshots_dir: Path, output_dir: Path) -> Note:
-        """
-        Process HTML content to:
-        1. Find all external links
-        2. Check if we have snapshots for them
-        3. Add snapshot-id and metadata attributes to links that have snapshots
-        4. Copy snapshot HTML files to the output directory
+    def _needs_rebuild(self, file_path: Path) -> bool:
+        """Check if a file needs to be rebuilt."""
+        # For now, always rebuild during content processing phase
+        # The template-based output generation will handle the actual rebuild logic
+        return True
 
-        Args:
-            html_content: The HTML content to process
-            snapshots_dir: Directory containing snapshots
-            output_dir: Build output directory
+    async def _build_base_templates(self) -> None:
+        """Build base templates that are copied 1:1 to HTML."""
+        if not self.config.templates or not self.jinja_env:
+            return
 
-        Returns:
-            Modified HTML content with snapshot attributes added
-        """
-        soup = BeautifulSoup(note.html_content, "html.parser")
-        snapshot_output_dir = output_dir / "snapshots"
-        snapshot_output_dir.mkdir(exist_ok=True)
+        for template_path in self.config.templates.base_templates:
+            try:
+                template = self.jinja_env.get_template(template_path)
 
-        processed_links: dict[str, SnapshotMetadata] = {}
+                # Create global context for template
+                global_context = self._create_global_context()
 
-        for link in soup.find_all("a", href=True):
-            href = link["href"]
+                # Render template
+                rendered_content = template.render(**global_context)
 
-            # Skip relative links
-            if not any(href.startswith(prefix) for prefix in ["http://", "https://", "www."]):
-                continue
+                # Determine output path
+                output_path = self.config.output_dir / Path(template_path).with_suffix(
+                    ".html"
+                )
+                output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            snapshot_id = get_url_hash(href)
-            snapshot_dir = snapshots_dir / snapshot_id
+                # Write output
+                output_path.write_text(rendered_content, encoding="utf-8")
 
-            if snapshot_dir.exists():
-                # Load metadata
-                metadata_file = snapshot_dir / "metadata.json"
-                if metadata_file.exists():
+            except Exception as e:
+                console.print(
+                    f"[red]Error building base template {template_path}:[/red] {e}"
+                )
+
+    def _create_global_context(self) -> dict[str, Any]:
+        """Create global context for templates."""
+        return {
+            "site": {
+                "title": self.config.site_title,
+                "description": self.config.site_description,
+                "url": self.config.site_url,
+            },
+            "config": self.config.model_dump(),
+            "build_metadata": {
+                "generator": "Scribe",
+                "version": "1.0.0",
+                "build_time": datetime.now().isoformat(),
+            },
+            "notes": NotesAccessor(self.processed_notes, self.predicate_matcher),
+        }
+
+    async def _copy_static_files(self) -> None:
+        """Copy static files to output directory, merging with existing content."""
+        if not self.config.static_path or not self.config.static_path.exists():
+            return
+
+        static_path = self.config.static_path
+        output_path = self.config.output_dir
+
+        # Walk through all files in static directory
+        for item in static_path.rglob("*"):
+            if item.is_file():
+                # Calculate relative path from static_path
+                relative_path = item.relative_to(static_path)
+
+                # Determine output location
+                output_file = output_path / relative_path
+
+                # Create parent directories if they don't exist
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+
+                # Copy file if it doesn't exist or is newer
+                if (
+                    not output_file.exists()
+                    or item.stat().st_mtime > output_file.stat().st_mtime
+                ):
                     try:
-                        metadata = SnapshotMetadata.from_file(metadata_file)
-
-                        # Add this metadata to the lookup table for this note
-                        processed_links[href] = metadata
-
-                        # Copy only the HTML snapshot if it hasn't been copied yet
-                        source_html = snapshot_dir / "snapshot.html"
-                        target_dir = snapshot_output_dir / snapshot_id
-                        target_html = target_dir / "snapshot.html"
-
-                        if source_html.exists() and not target_html.exists():
-                            target_dir.mkdir(exist_ok=True)
-                            copy2(source_html, target_html)
-                            console.print(f"[green]Copied snapshot for {href}[/green]")
-
-                    except Exception as e:
+                        shutil.copy2(item, output_file)
                         console.print(
-                            f"[red]Error processing snapshot metadata for {href}: {str(e)}[/red]"
+                            f"[green]Copied static file:[/green] {relative_path}"
                         )
+                    except Exception as e:
+                        console.print(f"[red]Error copying {item}:[/red] {e}")
 
-        new_note = note.model_copy(update={"snapshots": processed_links})
-        return new_note
+    async def _write_output_file(self, ctx: PageContext) -> None:
+        """Write the processed content to output file."""
+        # Ensure output directory exists
+        ctx.output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # For now, just write the HTML content
+        # In a full implementation, this would use templates
+        html_content = self._generate_html(ctx)
+
+        ctx.output_path.write_text(html_content, encoding="utf-8")
+
+    def _generate_html(self, ctx: PageContext) -> str:
+        """Generate HTML for a page context."""
+        # Try to use note templates first
+        if self.config.templates and self.jinja_env:
+            template_content = self._render_with_note_templates(ctx)
+            if template_content:
+                return template_content
+
+        # Fall back to simple HTML template
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{ctx.title or "Untitled"}</title>
+    {
+            f'<meta name="description" content="{ctx.description}">'
+            if ctx.description
+            else ""
+        }
+</head>
+<body>
+    <main>
+        <article>
+            {f"<h1>{ctx.title}</h1>" if ctx.title else ""}
+            {f'<p class="meta">By {ctx.author}</p>' if ctx.author else ""}
+            {f'<p class="meta">{ctx.date}</p>' if ctx.date else ""}
+            <div class="content">
+                {ctx.content}
+            </div>
+            {f'<div class="tags">Tags: {", ".join(ctx.tags)}</div>' if ctx.tags else ""}
+        </article>
+    </main>
+</body>
+</html>"""
+
+    def _render_with_note_templates(self, ctx: PageContext) -> str | None:
+        """Try to render the page context with note templates."""
+        if not self.config.templates or not self.jinja_env:
+            return None
+
+        # Find matching template
+        for note_template in self.config.templates.note_templates:
+            if self._note_matches_template(ctx, note_template):
+                try:
+                    template = self.jinja_env.get_template(note_template.template_path)
+
+                    # Create template context
+                    template_context = self._create_note_template_context(ctx)
+
+                    # Render template
+                    return template.render(**template_context)
+
+                except Exception as e:
+                    console.print(
+                        f"[red]Error rendering template "
+                        f"{note_template.template_path}:[/red] {e}"
+                    )
+                    continue
+
+        return None
+
+    def _note_matches_template(self, ctx: PageContext, note_template) -> bool:
+        """Check if a note context matches a template's predicates."""
+        # If no predicates, match all
+        if not note_template.predicates:
+            return True
+
+        # Use the predicate matcher to check predicates
+        return self.predicate_matcher.matches_predicates(
+            ctx, tuple(note_template.predicates)
+        )
+
+    async def _generate_outputs_from_templates(self, force_rebuild: bool) -> None:
+        """Generate outputs for notes based on note templates."""
+        if not self.config.templates or not self.config.templates.note_templates:
+            logger.debug("No note templates configured, skipping output generation")
+            return
+
+        # Track which notes have been processed to avoid duplicates
+        processed_notes = set()
+
+        # Iterate through each note template
+        for note_template in self.config.templates.note_templates:
+            logger.debug(f"Processing template: {note_template.template_path}")
+
+            # Find notes that match this template
+            matching_notes = []
+            for ctx in self.processed_notes:
+                if ctx.source_path in processed_notes:
+                    continue  # Skip if already processed by another template
+
+                if self._note_matches_template(ctx, note_template):
+                    # Check status requirements - only generate for DRAFT or PUBLISH
+                    if force_rebuild or ctx.status in (
+                        PageStatus.DRAFT,
+                        PageStatus.PUBLISH,
+                    ):
+                        matching_notes.append(ctx)
+                        processed_notes.add(ctx.source_path)
+
+            # Generate output for matching notes
+            logger.info(
+                f"Template '{note_template.template_path}' matches "
+                f"{len(matching_notes)} notes"
+            )
+
+            for ctx in matching_notes:
+                await self._generate_output_for_note(ctx, force_rebuild)
+
+    async def _generate_output_for_note(
+        self, ctx: PageContext, force_rebuild: bool
+    ) -> None:
+        """Generate output for a single note."""
+        # Log the final URL/path for this note
+        relative_output = ctx.output_path.relative_to(self.config.output_dir)
+        logger.info(f"Note '{ctx.title or ctx.source_path.stem}' → /{relative_output}")
+
+        # Write output file
+        await self._write_output_file(ctx)
+        logger.info(f"Written output file: {ctx.output_path}")
+
+    def _update_output_path_from_template(self, ctx: PageContext) -> None:
+        """Update the output path based on matching note template URL pattern."""
+        if not self.config.templates or not self.config.templates.note_templates:
+            return
+
+        # Find the first matching template
+        for note_template in self.config.templates.note_templates:
+            if self._note_matches_template(ctx, note_template):
+                # Generate output path from URL pattern
+                url_pattern = note_template.url_pattern
+
+                logger.debug(
+                    f"Note matches template '{note_template.template_path}' "
+                    f"with URL pattern '{url_pattern}'"
+                )
+
+                # Replace {slug} with actual slug
+                if "{slug}" in url_pattern:
+                    url_path = url_pattern.replace("{slug}", ctx.slug or "untitled")
+                else:
+                    url_path = url_pattern
+
+                # Remove leading slash and convert to path
+                url_path = url_path.lstrip("/")
+
+                # If URL ends with '/', treat it as a directory and add index.html
+                if url_path.endswith("/"):
+                    output_path = self.config.output_dir / url_path / "index.html"
+                else:
+                    # Otherwise, add .html extension if not present
+                    if not url_path.endswith(".html"):
+                        url_path += ".html"
+                    output_path = self.config.output_dir / url_path
+
+                # Update the context's output path
+                ctx.output_path = output_path
+                logger.debug(f"Updated output path to: {output_path}")
+                return
+
+    def _create_note_template_context(self, ctx: PageContext) -> dict[str, Any]:
+        """Create template context for note templates."""
+        # Start with global context
+        template_context = self._create_global_context()
+
+        # Add note-specific context
+        template_context["note"] = ctx.model_dump(mode="json")
+
+        # Add plugin functions to template context
+        self._add_plugin_functions_to_context(template_context, ctx)
+
+        return template_context
+
+    def _add_plugin_functions_to_context(
+        self, template_context: dict[str, Any], ctx: PageContext
+    ) -> None:
+        """Add plugin functions to template context."""
+        # Image helper has been removed
+
+        # Add other plugin functions as needed
+        # This can be extended for other plugins that provide template functions
+
+    def _report_build_errors(self) -> None:
+        """Report any validation or processing errors that occurred during the build."""
+        if not self.build_errors:
+            return
+
+        console.print("\n[yellow]Build completed with the following errors:[/yellow]")
+        console.print()
+
+        for file_path, errors in self.build_errors.items():
+            console.print(f"[red]File: {file_path}[/red]")
+            for error in errors:
+                console.print(f"  • {error}")
+            console.print()
+
+        error_count = sum(len(errors) for errors in self.build_errors.values())
+        file_count = len(self.build_errors)
+        console.print(
+            f"[yellow]Total: {error_count} error(s) in {file_count} file(s)[/yellow]"
+        )
+        console.print()
+
+    def cleanup(self) -> None:
+        """Cleanup resources."""
+        self.plugin_manager.teardown()
+        self.build_plugin_manager.teardown()

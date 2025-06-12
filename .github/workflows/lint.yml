@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        python: ["3.10", "3.11"]
+        python: ["3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v3
@@ -28,6 +28,6 @@ jobs:
         run: |
           uv sync
 
-      - name: Run MyPy for type checking
+      - name: Run linting
         run: |
           make lint-ci

@@ -1,120 +1,210 @@
-# scribe
+# Scribe
 
-Blogging system for my personal site, [freeman.vc](https://freeman.vc). Intended as a bare-bones and fast Python library that supports:
+A static site generator with an extendable plugin architecture. I use this to power [pierce.dev](https://pierce.dev).
 
-- Filesystem-based markdown notes
-- Code & terminal syntax support
-- Note lifecycle support; work on drafts concurrently with published notes
-- Fast rebuilding of the full website payload
-- Tailwind styling support
-- Local development server
+## Features
 
-## Conventions
+- **Fast**: Built with asyncio for concurrent processing
+- **Modular**: Flexible plugin architecture for extensibility
+- **Developer-friendly**: Hot reloading with `watchfiles` and live preview
+- **Configurable**: YAML configuration with sensible defaults
 
-Raw markdown files are used as the dynamic blog entries of the site. These files drive their own customization - in order to do so we rely on some file conventions.
-
-1. Posts are expected to begin with a header that determines the post title and its URL.
-2. Posts include a `meta` yaml body that specify its properties. If you don't specify one manually, Scribe will add one at runtime for each markdown file in its tracked directory.
-3. Images bundled with the post should live within the same folder as the parent post.
-
-```
-# Header
-
-meta:
-    date: February 2, 2022
-    status: publish
-    tags:
-        - tag1
-        - tag2
-
-This post is the next best thing since the Apple I.
-```
-
-For full metadata schematic, see the `NoteMetadata` class.
-
-**date**: Human readible date, parsed with the `python-dateutil` parser. This supports fuzzy parsing but I typically use a `Month Day, Year` convention.
-
-**status**:  Articles are scratch drafts by default. This means they won't be published anywhere on the website at build time. Files without the `meta` are also considered scratch notes, so early works in progress won't be bundled. Documents set to `state: draft` will create a page that's only resolvable with its direct link. Draft pages won't be available in the global index that appears on the homepage. Add the `state: publish` metadata flag to consider it launched and therefore globally visible.
-
-**tags**: List of tags that are tied to this page. These can be filtered in the jinja templates using the `filter_tag` function plugin.
-
-**featured_photos**: Data structure to store images that don't appear in the page body but should be used in different elements of the site. Used currently for the travel photo gallary.
-
-## Getting Started
-
-To install:
+## Installation
 
 ```bash
-uv sync
-npm install
+pip install scribe
 ```
 
-## Commands
+## Quick Start
 
-When writing, use the auto-refresh utility:
-
+1. Initialize a new project:
 ```bash
-uv run scribe --notes public start-writing [--port]
+scribe init
 ```
 
-If you'd like to build without the full CLI:
-
+2. Start the development server:
 ```bash
-uv run scribe --notes public build
+scribe dev
 ```
 
-If you want to number footnotes correctly based on the order they're cited in the post:
+3. Open your browser to `http://localhost:8000`
 
-```bash
-uv run scribe --notes public format
+## CLI Commands
+
+- `scribe init` - Initialize a new project
+- `scribe build --output <dir>` - Build the static site to specified directory
+- `scribe dev` - Start development server with file watching and auto-rebuild
+- `scribe add-headers` - Add frontmatter headers to markdown files that don't have them
+- `scribe config` - Show current configuration
+
+## Configuration
+
+Configuration is stored in `~/.scribe/config.yml`:
+
+```yaml
+source_dir: ./content
+output_dir: ./dist
+site_title: My Site
+site_description: A great site
+host: 127.0.0.1
+port: 8000
+note_plugins:
+  - name: frontmatter
+    enabled: true
+  - name: markdown
+    enabled: true
+templates:
+  template_path: ./templates
+  base_templates:
+    - index.j2
+    - about.j2
+  note_templates:
+    - template_path: blog_post.j2
+      url_pattern: /blog/{slug}/
+      predicates:
+        - is_published
+        - has_tag:blog
+static_path: ./static
 ```
 
-When you want to snapshot the all ahrefs for archival embedding within the page:
+## Plugin Architecture
 
-```bash
-uv run scribe --notes public snapshot-links
+Scribe uses a flexible plugin system where each markdown file is processed through a chain of plugins. Each plugin receives a `PageContext` object containing metadata and content.
+
+### Built-in Plugins
+
+- **FrontmatterPlugin**: Extracts YAML frontmatter from markdown files
+- **MarkdownPlugin**: Converts markdown to HTML
+- **SlugPlugin**: Generates URL slugs
+- **DatePlugin**: Parses and formats dates
+
+### Creating Custom Plugins
+
+```python
+from scribe.plugins.base import Plugin
+from scribe.context import PageContext
+
+class MyPlugin(Plugin):
+    async def process(self, ctx: PageContext) -> PageContext:
+        # Process the context
+        return ctx
 ```
 
-## ZSH Shortcuts
+## Markdown Document Headers
 
-To make it easier to work with scribe, you can add the following to your `~/.zshrc`:
+Scribe supports YAML frontmatter headers in markdown documents for metadata and configuration.
 
-```zsh
-# Scribe blog shortcut
-scribe() {
-    cd ~/projects/scribe && uv run scribe --notes ~/notes/public $@"
-}
+### Header Format
+
+Use standard YAML frontmatter with `---` delimiters at the beginning of your markdown files:
+
+```markdown
+---
+title: "My Blog Post"
+description: "A comprehensive guide to something amazing"
+author: "John Doe"
+date: "2024-01-15"
+tags: ["python", "web-development", "static-sites"]
+draft: false
+slug: "my-custom-slug"
+---
+
+# Your content title
+
+Your markdown content goes here...
 ```
 
-After adding this, reload your shell configuration with `source ~/.zshrc`. Then you can simply type:
+### Supported Fields
 
-```zsh
-scribe start-writing
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Page title (can be overridden by markdown `#` header) |
+| `description` | string | Meta description for SEO |
+| `author` | string | Author name |
+| `date` | string | Publication date (formats: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, YYYY/MM/DD) |
+| `tags` | list/string | Tags as array or comma-separated string |
+| `slug` | string | Custom URL slug (auto-generated from filename if not provided) |
+| `template` | string | Specific template to use for this page |
+| `layout` | string | Layout specification |
+| `draft` | boolean | Whether the page is a draft (excludes from `is_published` predicate) |
+| `permalink` | string | Custom permalink override |
+
+### Processing Behavior
+
+1. **Title Priority**: Markdown headers (`# Title`) override frontmatter titles
+2. **Tag Formats**: Tags can be specified as `["tag1", "tag2"]` or `"tag1, tag2"`
+3. **Date Parsing**: Multiple date formats supported with intelligent fallback
+4. **Auto-generation**: Missing slugs and URLs are automatically generated from filenames
+5. **Template Access**: All frontmatter data is available in templates via `note.frontmatter`
+
+## Template System
+
+Scribe uses Jinja2 templates for rendering HTML pages. Templates are configured in your `config.yml` file.
+
+### Template Types
+
+- **Base Templates**: Standalone templates that render 1:1 to HTML files with global site context
+- **Note Templates**: Templates that wrap individual markdown notes with filtering predicates
+
+### Template Variables
+
+All templates receive the following variables:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `site.title` | string | Site title from configuration |
+| `site.description` | string | Site description from configuration |
+| `site.url` | string | Base URL for the site |
+| `config` | dict | Full configuration object |
+
+### Note Template Variables
+
+Note templates additionally receive a `note` object with the following properties:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `note.title` | string | Page title from frontmatter or filename |
+| `note.content` | string | Rendered HTML content |
+| `note.author` | string | Author from frontmatter |
+| `note.date` | string | Formatted date |
+| `note.tags` | list | List of tags from frontmatter |
+| `note.description` | string | Meta description |
+| `note.slug` | string | URL slug |
+| `note.url` | string | Full URL path |
+| `note.is_draft` | boolean | Whether the note is a draft |
+| `note.frontmatter` | dict | Raw frontmatter data |
+| `note.source_path` | string | Path to source markdown file |
+| `note.relative_path` | string | Relative path from source directory |
+| `note.modified_time` | float | File modification timestamp |
+
+### Template Predicates
+
+Filter which notes match templates using predicates:
+
+| Predicate | Description |
+|-----------|-------------|
+| `all` | Matches all notes |
+| `is_published` | Matches non-draft notes |
+| `is_draft` | Matches draft notes only |
+| `has_tag:tagname` | Matches notes with specific tag |
+
+## Static Files
+
+Scribe can copy static files (CSS, JavaScript, images, etc.) directly to the output directory without processing.
+
+Configure the `static_path` in your config to specify a directory containing static assets:
+
+```yaml
+static_path: ./static
 ```
 
-This will:
-1. Navigate to your scribe directory
-2. Install/update dependencies using uv
-3. Start the writing server
+### How It Works
 
-You can also pass additional arguments like `--port` directly: `start-writing --port 8001`
+- All files in the `static_path` directory are copied recursively to the output directory
+- Files are only copied if they don't exist or are newer than the existing file
+- Directory structures are preserved and merged with generated content
+- Static files can coexist with generated HTML files in the same directories
 
-If you need to further debug the build process, you can set the `SCRIBE_LOG_LEVEL` environment variable.
+## License
 
-```bash
-SCRIBE_LOG_LEVEL=DEBUG scribe start-writing
-```
-
-## Styles
-
-Default styles are generated by Tailwind, which is automatically launched when `start-writing` is invoked. To watch or regenerate the styles explicitly, run:
-
-```bash
-npx tailwindcss -i ./style.css -o ./scribe/resources/style.css --watch
-```
-
-Code highlighting is powered by pygmentize with the solarized-dark theme. These styles operate separately from tailwind. To generate, run:
-
-```bash
-pygmentize -S solarized-dark -f html -a .codehilite > ./scribe/resources/code.css
-```
+MIT License

@@ -1,0 +1,13 @@
+Only ever put imports at the top of the file. Never embed them with functions unless you're
+explicitly solving an import cycle, at which point you should reconsider the design to see if you
+should move the common components into a third file.
+
+When you're making changes to existing functionality, always run `uv run pytest -vvv` to ensure
+that your changes haven't broken the tests. Consider whether the tests should be changed then
+change the tests or the logic.
+
+Always do imports from the current project as absolute imports: `from {myproj}.file import {items}`
+
+When you have finished implementing a new feature, or fixing changes, AFTER you have confirmed things
+work by running the tests, you should also run the linting and verify that all of the changes
+are using valid Python. Run `make lint` to run our full linting pipeline.
