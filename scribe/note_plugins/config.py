@@ -13,6 +13,7 @@ class PluginName(PluginNameEnum):
 
     FRONTMATTER = "frontmatter"
     FOOTNOTES = "footnotes"
+    LINK_RESOLUTION = "link_resolution"
     MARKDOWN = "markdown"
     DATE = "date"
     SCREENSHOT = "screenshot"
@@ -53,6 +54,21 @@ class FootnotesPluginConfig(BaseNotePluginConfig):
     """
 
     name: Literal[PluginName.FOOTNOTES] = PluginName.FOOTNOTES
+    before_dependencies: list[PluginName] = [PluginName.MARKDOWN]
+
+
+class LinkResolutionPluginConfig(BaseNotePluginConfig):
+    """Configuration for the link resolution plugin.
+
+    Example YAML configuration:
+    ```yaml
+    link_resolution:
+      name: link_resolution
+      enabled: true
+    ```
+    """
+
+    name: Literal[PluginName.LINK_RESOLUTION] = PluginName.LINK_RESOLUTION
     before_dependencies: list[PluginName] = [PluginName.MARKDOWN]
 
 
@@ -201,6 +217,7 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
 PluginConfig = Annotated[
     FrontmatterPluginConfig
     | FootnotesPluginConfig
+    | LinkResolutionPluginConfig
     | MarkdownPluginConfig
     | DatePluginConfig
     | ScreenshotPluginConfig
