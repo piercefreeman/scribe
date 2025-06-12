@@ -27,6 +27,7 @@ from scribe.note_plugins.config import (
     DatePluginConfig,
     FootnotesPluginConfig,
     FrontmatterPluginConfig,
+    LinkResolutionPluginConfig,
     MarkdownPluginConfig,
 )
 from scribe.predicates import PredicateMatcher
@@ -52,6 +53,7 @@ class SiteBuilder:
         self.default_plugins: list[BaseNotePluginConfig] = [
             FrontmatterPluginConfig(),
             FootnotesPluginConfig(),
+            LinkResolutionPluginConfig(),
             MarkdownPluginConfig(),
             DatePluginConfig(),
         ]
