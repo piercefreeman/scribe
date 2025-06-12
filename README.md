@@ -9,22 +9,16 @@ A static site generator with an extendable plugin architecture. I use this to po
 - **Developer-friendly**: Hot reloading with `watchfiles` and live preview
 - **Configurable**: YAML configuration with sensible defaults
 
-## Installation
-
-```bash
-pip install scribe
-```
-
 ## Quick Start
 
 1. Initialize a new project:
 ```bash
-scribe init
+uv run scribe init
 ```
 
 2. Start the development server:
 ```bash
-scribe dev
+uv run scribe dev
 ```
 
 3. Open your browser to `http://localhost:8000`
