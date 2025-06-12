@@ -1,7 +1,0 @@
-{
-  "language_overrides": {
-    "HTML": {
-      "linter.enable": false
-    }
-  }
-}
