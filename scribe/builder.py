@@ -117,6 +117,12 @@ class SiteBuilder:
         self.processed_notes.clear()
         self.build_errors.clear()
 
+        # Ensure the input path exists
+        if not self.config.source_dir.exists():
+            raise FileNotFoundError(
+                f"Input directory {self.config.source_dir} does not exist"
+            )
+
         # Find all markdown files
         markdown_files = self._find_markdown_files()
 

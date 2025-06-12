@@ -1,6 +1,5 @@
 """Test build plugin manager dependency resolution."""
 
-
 from scribe.build_plugins.config import (
     BuildPluginName,
     TailwindBuildPluginConfig,
