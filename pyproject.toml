@@ -93,8 +93,10 @@ strict_equality = true
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.402",
     "pytest>=8.4.0",
     "pytest-asyncio>=0.21.0",
+    "ruff>=0.11.13",
 ]
 
 [tool.pytest.ini_options]

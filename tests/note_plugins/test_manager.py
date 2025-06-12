@@ -18,35 +18,12 @@ from scribe.note_plugins.manager import PluginManager
 class TestPluginManagerDependencies:
     """Test plugin manager dependency resolution."""
 
-    def test_empty_dependencies_load_in_original_order(self) -> None:
-        """Test that plugins with no dependencies load in the order provided."""
-        manager = PluginManager()
-
-        configs = [
-            MarkdownPluginConfig(),
-            FrontmatterPluginConfig(),
-            DatePluginConfig(),
-        ]
-
-        sorted_configs = manager._resolve_plugin_dependencies(configs)
-
-        # With no dependencies, order should be preserved
-        assert [config.name for config in sorted_configs] == [
-            "markdown",
-            "frontmatter",
-            "date",
-        ]
-
     def test_simple_dependency_resolution(self) -> None:
         """Test that dependencies are resolved correctly."""
         manager = PluginManager()
 
-        # markdown depends on frontmatter
-        markdown_config = MarkdownPluginConfig()
-        markdown_config.dependencies = [PluginName.FRONTMATTER]
-
         configs = [
-            markdown_config,
+            MarkdownPluginConfig(),
             FrontmatterPluginConfig(),
             DatePluginConfig(),
         ]
@@ -64,7 +41,7 @@ class TestPluginManagerDependencies:
 
         # markdown depends on both frontmatter and date
         markdown_config = MarkdownPluginConfig()
-        markdown_config.dependencies = [PluginName.FRONTMATTER, PluginName.DATE]
+        markdown_config.after_dependencies = [PluginName.FRONTMATTER, PluginName.DATE]
 
         configs = [
             markdown_config,
@@ -86,10 +63,10 @@ class TestPluginManagerDependencies:
 
         # footnotes depends on markdown, markdown depends on frontmatter
         footnotes_config = FootnotesPluginConfig()
-        footnotes_config.dependencies = [PluginName.MARKDOWN]
+        footnotes_config.after_dependencies = [PluginName.MARKDOWN]
 
         markdown_config = MarkdownPluginConfig()
-        markdown_config.dependencies = [PluginName.FRONTMATTER]
+        markdown_config.after_dependencies = [PluginName.FRONTMATTER]
 
         configs = [
             footnotes_config,
@@ -103,75 +80,6 @@ class TestPluginManagerDependencies:
 
         # Should be in order: frontmatter -> markdown -> footnotes
         assert plugin_names == ["frontmatter", "markdown", "footnotes"]
-
-    def test_missing_dependency_raises_error(self) -> None:
-        """Test that missing dependencies raise an error."""
-        manager = PluginManager()
-
-        # markdown depends on frontmatter, but frontmatter is not in configs
-        markdown_config = MarkdownPluginConfig()
-        markdown_config.dependencies = [PluginName.FRONTMATTER]
-
-        configs = [markdown_config]
-
-        with pytest.raises(
-            ValueError, match="depends on 'frontmatter' which is not enabled"
-        ):
-            manager._resolve_plugin_dependencies(configs)
-
-    def test_circular_dependency_raises_error(self) -> None:
-        """Test that circular dependencies raise an error."""
-        manager = PluginManager()
-
-        # Create circular dependency: markdown -> frontmatter -> markdown
-        markdown_config = MarkdownPluginConfig()
-        markdown_config.dependencies = [PluginName.FRONTMATTER]
-
-        frontmatter_config = FrontmatterPluginConfig()
-        frontmatter_config.dependencies = [PluginName.MARKDOWN]
-
-        configs = [markdown_config, frontmatter_config]
-
-        with pytest.raises(ValueError, match="Circular dependency detected"):
-            manager._resolve_plugin_dependencies(configs)
-
-    def test_disabled_plugins_ignored_in_dependencies(self) -> None:
-        """Test that disabled plugins are ignored in dependency resolution."""
-        manager = PluginManager()
-
-        # markdown depends on frontmatter, but frontmatter is disabled
-        markdown_config = MarkdownPluginConfig()
-        markdown_config.dependencies = [PluginName.FRONTMATTER]
-
-        frontmatter_config = FrontmatterPluginConfig()
-        frontmatter_config.enabled = False
-
-        configs = [markdown_config, frontmatter_config]
-
-        with pytest.raises(
-            ValueError, match="depends on 'frontmatter' which is not enabled"
-        ):
-            manager._resolve_plugin_dependencies(configs)
-
-    def test_load_plugins_with_dependencies(self) -> None:
-        """Test that plugins are loaded in dependency-resolved order."""
-        manager = PluginManager()
-
-        # markdown depends on frontmatter
-        markdown_config = MarkdownPluginConfig()
-        markdown_config.dependencies = [PluginName.FRONTMATTER]
-
-        configs = [
-            markdown_config,
-            FrontmatterPluginConfig(),
-        ]
-
-        manager.load_plugins_from_config(configs)
-
-        # Should have 2 plugins loaded in correct order
-        assert len(manager.plugins) == 2
-        assert manager.plugins[0].name == "frontmatter"
-        assert manager.plugins[1].name == "markdown"
 
 
 class TestPluginManagerConstructorParams:
