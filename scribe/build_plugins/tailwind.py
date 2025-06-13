@@ -16,7 +16,7 @@ class TailwindBuildPlugin(BuildPlugin[TailwindBuildPluginConfig]):
 
     name = BuildPluginName.TAILWIND
 
-    async def execute(self, site_config: ScribeConfig, output_dir: Path) -> None:
+    async def after_all(self, site_config: ScribeConfig, output_dir: Path) -> None:
         """Execute Tailwind CSS compilation."""
         # Get input path from config
         input_css = self.config.input
@@ -73,6 +73,10 @@ class TailwindBuildPlugin(BuildPlugin[TailwindBuildPluginConfig]):
                 "Tailwind CSS CLI not found. Please install it with: "
                 "npm install -D @tailwindcss/cli"
             ) from None
+
+    # Legacy method - remove when all plugins are updated
+    async def execute(self, site_config: ScribeConfig, output_dir: Path) -> None:
+        await self.after_all(site_config, output_dir)
 
     def setup(self) -> None:
         """Setup hook called when plugin is loaded."""

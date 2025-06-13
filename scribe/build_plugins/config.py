@@ -13,6 +13,7 @@ class BuildPluginName(PluginNameEnum):
 
     TAILWIND = "tailwind"
     TYPESCRIPT = "typescript"
+    LINK_RESOLUTION = "link_resolution"
 
 
 class BaseBuildPluginConfig(BasePluginConfig[BuildPluginName]):
@@ -85,7 +86,26 @@ class TypeScriptBuildPluginConfig(BaseBuildPluginConfig):
     flags: list[str] = Field(default_factory=list)
 
 
+class LinkResolutionBuildPluginConfig(BaseBuildPluginConfig):
+    """Configuration for the link resolution build plugin.
+
+    Resolves markdown page links to actual slug destinations after all notes
+    are processed but before they are written to disk.
+
+    Example YAML configuration:
+    ```yaml
+    link_resolution:
+      name: link_resolution
+      enabled: true
+    ```
+    """
+
+    name: Literal[BuildPluginName.LINK_RESOLUTION] = BuildPluginName.LINK_RESOLUTION
+
+
 BuildPluginConfig = Annotated[
-    TailwindBuildPluginConfig | TypeScriptBuildPluginConfig,
+    TailwindBuildPluginConfig
+    | TypeScriptBuildPluginConfig
+    | LinkResolutionBuildPluginConfig,
     Field(discriminator="name"),
 ]
