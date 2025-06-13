@@ -142,9 +142,14 @@ class SiteBuilder:
         self.build_errors.clear()
 
         # Execute build plugins before_notes phase
-        await self.build_plugin_manager.execute_before_notes(
-            self.config, self.config.output_dir
-        )
+        try:
+            await self.build_plugin_manager.execute_before_notes(
+                self.config, self.config.output_dir
+            )
+        except Exception as e:
+            self.build_errors["build_plugins_before_notes"] = [
+                f"Before notes plugin error: {e}"
+            ]
 
         # Ensure the input path exists
         if not self.config.source_dir.exists():
@@ -167,9 +172,16 @@ class SiteBuilder:
         self.processed_notes = [ctx for ctx in results if ctx is not None]
 
         # Execute build plugins after_notes phase (can modify contexts)
-        self.processed_notes = await self.build_plugin_manager.execute_after_notes(
-            self.config, self.config.output_dir, self.processed_notes
-        )
+        try:
+            self.processed_notes = await self.build_plugin_manager.execute_after_notes(
+                self.config, self.config.output_dir, self.processed_notes
+            )
+        except Exception as e:
+            # Try to extract which file caused the error from the exception message
+            file_key = self._extract_file_from_error(str(e))
+            if file_key not in self.build_errors:
+                self.build_errors[file_key] = []
+            self.build_errors[file_key].append(f"Build plugin error: {e}")
 
         # Generate output based on note templates
         await self._generate_outputs_from_templates(force_rebuild)
@@ -181,9 +193,14 @@ class SiteBuilder:
         await self._copy_static_files()
 
         # Execute build plugins after_all phase
-        await self.build_plugin_manager.execute_after_all(
-            self.config, self.config.output_dir
-        )
+        try:
+            await self.build_plugin_manager.execute_after_all(
+                self.config, self.config.output_dir
+            )
+        except Exception as e:
+            self.build_errors["build_plugins_after_all"] = [
+                f"After all plugin error: {e}"
+            ]
 
         # Copy snapshot outputs after all processing is complete
         self.plugin_manager.copy_snapshot_outputs(self.config.output_dir)
@@ -616,3 +633,32 @@ class SiteBuilder:
         """Cleanup resources."""
         self.plugin_manager.teardown()
         self.build_plugin_manager.teardown()
+
+    def _extract_file_from_error(self, error_message: str) -> str:
+        """Extract the source file path from an error message when possible."""
+        # Look for patterns like "referenced in '/path/to/file.md'"
+        import re
+
+        # Try to extract file path from common error patterns
+        patterns = [
+            r"referenced in '([^']+)'",
+            r"in file '([^']+)'",
+            r"from '([^']+)'",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, error_message)
+            if match:
+                file_path = match.group(1)
+                # Convert to relative path if it's within our source directory
+                try:
+                    file_path_obj = Path(file_path)
+                    if file_path_obj.is_relative_to(self.config.source_dir):
+                        return str(file_path_obj.relative_to(self.config.source_dir))
+                    else:
+                        return str(file_path_obj.name)  # Just use filename
+                except (ValueError, OSError):
+                    return file_path
+
+        # If no file found in error message, use a generic key
+        return "unknown_file"
