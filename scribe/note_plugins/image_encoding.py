@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PIL import Image, ImageOps
+import pyvips
 
 if TYPE_CHECKING:
     from scribe.config import ScribeConfig
@@ -35,18 +35,19 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
         self._check_format_support()
 
     def _check_format_support(self) -> None:
-        """Check which formats are supported."""
-        self.supports_avif = self._test_format_support("AVIF", ".avif")
-        self.supports_webp = self._test_format_support("WEBP", ".webp")
+        """Check which formats are supported by libvips."""
+        self.supports_avif = self._test_format_support("avif")
+        self.supports_webp = self._test_format_support("webp")
 
-    def _test_format_support(self, pil_format: str, extension: str) -> bool:
-        """Test if PIL supports a specific format."""
+    def _test_format_support(self, format_name: str) -> bool:
+        """Test if libvips supports a specific format."""
         try:
-            test_img = Image.new("RGB", (1, 1))
+            # Create a small test image and try to save it
+            test_img = pyvips.Image.black(1, 1)
             with tempfile.NamedTemporaryFile(
-                suffix=extension, delete=False
+                suffix=f".{format_name}", delete=False
             ) as tmp_file:
-                test_img.save(tmp_file.name, format=pil_format)
+                test_img.write_to_file(tmp_file.name)
                 os.unlink(tmp_file.name)
             return True
         except Exception:
@@ -147,71 +148,66 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
         # Process the image
         try:
-            with Image.open(source_path) as img:
-                # Convert and orient the image
-                img = self._prepare_image(img)
-                original_dimensions = img.size
+            img = pyvips.Image.new_from_file(str(source_path), access="sequential")
+            # Convert and orient the image
+            img = self._prepare_image(img)
+            original_dimensions = img.width, img.height
 
-                # Generate responsive sizes and formats
-                processed_formats = []
-                responsive_data = {}
+            # Generate responsive sizes and formats
+            processed_formats = []
+            responsive_data = {}
 
-                for format_name in self.config.formats:
-                    if not self._format_supported(format_name):
-                        continue
+            for format_name in self.config.formats:
+                if not self._format_supported(format_name):
+                    continue
 
-                    responsive_data[format_name] = {}
-                    format_processed = False
+                responsive_data[format_name] = {}
+                format_processed = False
 
-                    if self.config.generate_responsive:
-                        # Generate responsive sizes for this image
-                        sizes_to_generate = []
+                if self.config.generate_responsive:
+                    # Generate responsive sizes for this image
+                    sizes_to_generate = []
 
-                        # Add responsive sizes smaller than or equal to original
-                        for size in self.config.responsive_sizes:
-                            if size <= img.width:
-                                sizes_to_generate.append(size)
+                    # Add responsive sizes smaller than or equal to original
+                    for size in self.config.responsive_sizes:
+                        if size <= img.width:
+                            sizes_to_generate.append(size)
 
-                        # Always include original size if no responsive sizes fit
-                        if not sizes_to_generate:
-                            sizes_to_generate.append(img.width)
-                        # Also add original size if it's not already included
-                        elif img.width not in sizes_to_generate:
-                            sizes_to_generate.append(img.width)
+                    # Always include original size if no responsive sizes fit
+                    if not sizes_to_generate:
+                        sizes_to_generate.append(img.width)
+                    # Also add original size if it's not already included
+                    elif img.width not in sizes_to_generate:
+                        sizes_to_generate.append(img.width)
 
-                        # Generate all applicable sizes
-                        for size in sizes_to_generate:
-                            if self._process_responsive_format(
-                                img,
-                                format_name,
-                                size,
-                                source_path,
-                                image_cache_dir,
-                                ctx,
-                            ):
-                                responsive_data[format_name][size] = (
-                                    self._get_responsive_path(
-                                        source_path, format_name, size, ctx
-                                    )
-                                )
-                                format_processed = True
-                    else:
-                        # Generate single size (original dimensions)
-                        if self._process_format(
-                            img, format_name, source_path, image_cache_dir, ctx
+                    # Generate all applicable sizes
+                    for size in sizes_to_generate:
+                        if self._process_responsive_format(
+                            img, format_name, size, source_path, image_cache_dir, ctx
                         ):
-                            responsive_data[format_name][original_dimensions[0]] = (
-                                self._get_converted_path(source_path, format_name, ctx)
+                            responsive_data[format_name][size] = (
+                                self._get_responsive_path(
+                                    source_path, format_name, size, ctx
+                                )
                             )
                             format_processed = True
+                else:
+                    # Generate single size (original dimensions)
+                    if self._process_format(
+                        img, format_name, source_path, image_cache_dir, ctx
+                    ):
+                        responsive_data[format_name][original_dimensions[0]] = (
+                            self._get_converted_path(source_path, format_name, ctx)
+                        )
+                        format_processed = True
 
-                    if format_processed:
-                        processed_formats.append(format_name)
+                if format_processed:
+                    processed_formats.append(format_name)
 
-                # Copy cache to output
-                await self._copy_cache_to_output(image_cache_dir, source_path, ctx)
+            # Copy cache to output
+            await self._copy_cache_to_output(image_cache_dir, source_path, ctx)
 
-                return processed_formats, responsive_data, original_dimensions
+            return processed_formats, responsive_data, original_dimensions
 
         except Exception as e:
             logger.error(f"Error processing image {source_path}: {e}")
@@ -227,7 +223,7 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
     def _process_responsive_format(
         self,
-        img: Image.Image,
+        img: pyvips.Image,
         format_name: str,
         target_width: int,
         source_path: Path,
@@ -240,44 +236,35 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
             if target_width > img.width:
                 return False
 
-            # Set format parameters
-            if format_name == "avif":
-                pil_format = "AVIF"
-                quality = self.config.quality_avif
-                extension = ".avif"
-            else:  # webp
-                pil_format = "WEBP"
-                quality = self.config.quality_webp
-                extension = ".webp"
-
             # Resize image maintaining aspect ratio or use original
             if target_width == img.width:
                 processed_img = img
             else:
-                aspect_ratio = img.height / img.width
-                new_height = int(target_width * aspect_ratio)
-                processed_img = img.resize(
-                    (target_width, new_height), Image.Resampling.LANCZOS
-                )
+                scale = target_width / img.width
+                processed_img = img.resize(scale)
 
             # Apply max_height constraint if specified
             if self.config.max_height and processed_img.height > self.config.max_height:
-                aspect_ratio = processed_img.width / processed_img.height
-                new_width = int(self.config.max_height * aspect_ratio)
-                processed_img = processed_img.resize(
-                    (new_width, self.config.max_height), Image.Resampling.LANCZOS
-                )
+                scale = self.config.max_height / processed_img.height
+                processed_img = processed_img.resize(scale)
 
             # Save to cache using slug-based naming
             base_name = ctx.generate_slug_from_text(source_path.stem)
-            output_file = cache_dir / f"{base_name}-{target_width}{extension}"
+            output_file = cache_dir / f"{base_name}-{target_width}.{format_name}"
 
             if self.config.verbose:
                 logger.debug(f"Saving responsive {format_name} file: {output_file}")
 
-            processed_img.save(
-                output_file, format=pil_format, quality=quality, optimize=True
-            )
+            # Set quality for the format
+            if format_name == "avif":
+                processed_img.write_to_file(
+                    str(output_file), Q=self.config.quality_avif
+                )
+            else:  # webp
+                processed_img.write_to_file(
+                    str(output_file), Q=self.config.quality_webp
+                )
+
             return True
 
         except Exception as e:
@@ -288,7 +275,7 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
     def _process_format(
         self,
-        img: Image.Image,
+        img: pyvips.Image,
         format_name: str,
         source_path: Path,
         cache_dir: Path,
@@ -296,39 +283,30 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
     ) -> bool:
         """Process image in a specific format (single size)."""
         try:
-            # Set format parameters
-            if format_name == "avif":
-                pil_format = "AVIF"
-                quality = self.config.quality_avif
-                extension = ".avif"
-            else:  # webp
-                pil_format = "WEBP"
-                quality = self.config.quality_webp
-                extension = ".webp"
-
             # Resize if needed
             processed_img = img
             if self.config.max_width and img.width > self.config.max_width:
-                aspect_ratio = img.height / img.width
-                new_height = int(self.config.max_width * aspect_ratio)
-                processed_img = img.resize(
-                    (self.config.max_width, new_height), Image.Resampling.LANCZOS
-                )
+                scale = self.config.max_width / img.width
+                processed_img = processed_img.resize(scale)
 
             if self.config.max_height and processed_img.height > self.config.max_height:
-                aspect_ratio = processed_img.width / processed_img.height
-                new_width = int(self.config.max_height * aspect_ratio)
-                processed_img = processed_img.resize(
-                    (new_width, self.config.max_height), Image.Resampling.LANCZOS
-                )
+                scale = self.config.max_height / processed_img.height
+                processed_img = processed_img.resize(scale)
 
             # Save to cache using slug-based naming
             base_name = ctx.generate_slug_from_text(source_path.stem)
-            output_file = cache_dir / f"{base_name}{extension}"
+            output_file = cache_dir / f"{base_name}.{format_name}"
 
-            processed_img.save(
-                output_file, format=pil_format, quality=quality, optimize=True
-            )
+            # Set quality for the format
+            if format_name == "avif":
+                processed_img.write_to_file(
+                    str(output_file), Q=self.config.quality_avif
+                )
+            else:  # webp
+                processed_img.write_to_file(
+                    str(output_file), Q=self.config.quality_webp
+                )
+
             return True
 
         except Exception as e:
@@ -476,17 +454,27 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
         return len(list(cache_dir.glob("*"))) > 0
 
-    def _prepare_image(self, img: Image.Image) -> Image.Image:
+    def _prepare_image(self, img: pyvips.Image) -> pyvips.Image:
         """Prepare image for processing."""
-        # Convert to RGB if necessary
-        if img.mode in ("RGBA", "LA", "P"):
-            if img.mode == "P" and "transparency" in img.info:
-                img = img.convert("RGBA")
-        elif img.mode not in ("RGB", "RGBA"):
-            img = img.convert("RGB")
+        # Ensure we have at least 3 bands (RGB)
+        if img.bands == 1:
+            # Convert grayscale to RGB
+            img = img.colourspace("srgb")
+        elif img.bands == 4:
+            # Convert RGBA to RGB by flattening with white background
+            img = img.flatten(background=[255, 255, 255])
 
-        # Apply auto-rotation
-        return ImageOps.exif_transpose(img)
+        # Apply auto-rotation based on EXIF orientation
+        try:
+            # Get the orientation from EXIF data
+            orientation = img.get("orientation")
+            if orientation and orientation != 1:
+                img = img.autorot()
+        except pyvips.Error:
+            # No orientation data, which is fine
+            pass
+
+        return img
 
     async def _copy_cache_to_output(
         self, cache_dir: Path, source_path: Path, ctx: PageContext
