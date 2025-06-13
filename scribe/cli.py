@@ -31,16 +31,9 @@ def main() -> None:
     help="Path to configuration file (defaults to ~/.scribe/config.yml)",
 )
 @click.option(
-    "--output",
-    "-o",
-    type=click.Path(file_okay=False, path_type=Path),
-    required=True,
-    help="Output directory for generated site (required)",
-)
-@click.option(
     "--clean/--no-clean", default=True, help="Clean output directory before building"
 )
-def build(config: Path | None, output: Path, clean: bool) -> None:
+def build(config: Path | None, clean: bool) -> None:
     """Build the static site."""
     site_config = ScribeConfig(config_file=config)
 
@@ -54,7 +47,6 @@ def build(config: Path | None, output: Path, clean: bool) -> None:
         raise click.Abort()
 
     # Override config with CLI options
-    site_config.output_dir = output
     site_config.clean_output = clean
 
     async def _build() -> None:
