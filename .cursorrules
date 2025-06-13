@@ -11,3 +11,7 @@ Always do imports from the current project as absolute imports: `from {myproj}.f
 When you have finished implementing a new feature, or fixing changes, AFTER you have confirmed things
 work by running the tests, you should also run the linting and verify that all of the changes
 are using valid Python. Run `make lint` to run our full linting pipeline.
+
+Some general coding conventions you should obey:
+- Don't nest functions in other functions. Prefer partial() to embedding nested functions. In the rare situation that it's really cleaner to nest functions (some recursive calls potentially), justify the nesting via a comment.
+- When if statements with a large amount of logic, consider whether it's better to terminate out the function early by checking the if(inverse condition) and then just returning

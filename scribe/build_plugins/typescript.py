@@ -19,7 +19,7 @@ class TypeScriptBuildPlugin(BuildPlugin[TypeScriptBuildPluginConfig]):
 
     name = BuildPluginName.TYPESCRIPT
 
-    async def execute(self, site_config: ScribeConfig, output_dir: Path) -> None:
+    async def after_all(self, site_config: ScribeConfig, output_dir: Path) -> None:
         """Execute TypeScript compilation."""
         # Get source directory from config
         source_dir = self.config.source
@@ -121,6 +121,10 @@ class TypeScriptBuildPlugin(BuildPlugin[TypeScriptBuildPluginConfig]):
                 "TypeScript compiler not found. Please install it with: "
                 "npm install -g typescript"
             ) from None
+
+    # Legacy method - remove when all plugins are updated
+    async def execute(self, site_config: ScribeConfig, output_dir: Path) -> None:
+        await self.after_all(site_config, output_dir)
 
     def setup(self) -> None:
         """Setup hook called when plugin is loaded."""

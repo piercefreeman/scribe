@@ -17,6 +17,10 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
+from scribe.build_plugins.config import (
+    BaseBuildPluginConfig,
+    LinkResolutionBuildPluginConfig,
+)
 from scribe.build_plugins.manager import BuildPluginManager
 from scribe.config import ScribeConfig
 from scribe.context import PageContext, PageStatus
@@ -27,7 +31,6 @@ from scribe.note_plugins.config import (
     DatePluginConfig,
     FootnotesPluginConfig,
     FrontmatterPluginConfig,
-    LinkResolutionPluginConfig,
     MarkdownPluginConfig,
 )
 from scribe.predicates import PredicateMatcher
@@ -53,9 +56,12 @@ class SiteBuilder:
         self.default_plugins: list[BaseNotePluginConfig] = [
             FrontmatterPluginConfig(),
             FootnotesPluginConfig(),
-            LinkResolutionPluginConfig(),
             MarkdownPluginConfig(),
             DatePluginConfig(),
+        ]
+
+        self.default_build_plugins: list[BaseBuildPluginConfig] = [
+            LinkResolutionBuildPluginConfig(),
         ]
 
         self._setup_plugins()
@@ -82,11 +88,27 @@ class SiteBuilder:
         self.plugin_manager.load_plugins_from_config(all_plugins)
 
     def _setup_build_plugins(self) -> None:
-        """Setup build plugins from config."""
+        """Setup default build plugins and load custom build plugins from config."""
+        # Combine default build plugins with user-configured build plugins
+        all_build_plugins = list(self.default_build_plugins)
+
         if self.config.build_plugins:
-            self.build_plugin_manager.load_plugins_from_config(
-                list(self.config.build_plugins)
-            )
+            # Add user-configured build plugins, avoiding duplicates
+            default_build_plugin_names = {
+                plugin.name for plugin in self.default_build_plugins
+            }
+
+            # Only add user plugins that don't override defaults
+            for plugin in self.config.build_plugins:
+                if plugin.name in default_build_plugin_names:
+                    # Replace default plugin with user configuration
+                    all_build_plugins = [
+                        p for p in all_build_plugins if p.name != plugin.name
+                    ]
+                all_build_plugins.append(plugin)
+
+        # Load all build plugins together so dependency resolution sees everything
+        self.build_plugin_manager.load_plugins_from_config(all_build_plugins)
 
     def _setup_templates(self) -> None:
         """Setup Jinja2 template environment if templates are configured."""
@@ -119,6 +141,11 @@ class SiteBuilder:
         self.processed_notes.clear()
         self.build_errors.clear()
 
+        # Execute build plugins before_notes phase
+        await self.build_plugin_manager.execute_before_notes(
+            self.config, self.config.output_dir
+        )
+
         # Ensure the input path exists
         if not self.config.source_dir.exists():
             raise FileNotFoundError(
@@ -139,6 +166,11 @@ class SiteBuilder:
         # Collect processed notes (filter out None results)
         self.processed_notes = [ctx for ctx in results if ctx is not None]
 
+        # Execute build plugins after_notes phase (can modify contexts)
+        self.processed_notes = await self.build_plugin_manager.execute_after_notes(
+            self.config, self.config.output_dir, self.processed_notes
+        )
+
         # Generate output based on note templates
         await self._generate_outputs_from_templates(force_rebuild)
 
@@ -148,8 +180,8 @@ class SiteBuilder:
         # Copy static files if configured
         await self._copy_static_files()
 
-        # Execute build plugins
-        await self.build_plugin_manager.execute_plugins(
+        # Execute build plugins after_all phase
+        await self.build_plugin_manager.execute_after_all(
             self.config, self.config.output_dir
         )
 
