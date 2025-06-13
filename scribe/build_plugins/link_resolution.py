@@ -1,6 +1,6 @@
 """Link resolution build plugin for updating markdown page links to actual slugs."""
 
-import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -18,214 +18,217 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class LinkResolutionBuildPlugin(BuildPlugin[LinkResolutionBuildPluginConfig]):
-    """Build plugin to resolve markdown page links to actual slug destinations."""
+@dataclass
+class PageLink:
+    """Represents a link found in page content."""
 
-    def __init__(self, config: LinkResolutionBuildPluginConfig) -> None:
-        super().__init__(config)
-        self.name = "link_resolution"  # Explicitly set the name
-        # Regex pattern for markdown links: [text](url)
-        self.markdown_link_pattern = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
+    url: str
+    text: str = ""
 
-    async def after_notes(
-        self, site_config: ScribeConfig, output_dir: Path, contexts: list[PageContext]
-    ) -> list[PageContext]:
-        """Process all notes to resolve page links to actual slugs."""
-        # Build a mapping of page identifiers to their final URLs
-        page_slug_map = self._build_page_slug_map(contexts, site_config)
+    def is_external(self) -> bool:
+        """Check if this is an external link."""
+        return self.url.startswith(("http://", "https://", "mailto:", "ftp://", "//"))
 
-        logger.info(f"Built link resolution map with {len(page_slug_map)} entries")
+    def is_anchor(self) -> bool:
+        """Check if this is an anchor link."""
+        return self.url.startswith("#")
 
-        # Process each context to resolve links
-        for ctx in contexts:
-            ctx.content = self._resolve_links_in_content(
-                ctx.content, ctx, page_slug_map
-            )
+    def should_resolve(self) -> bool:
+        """Check if this link should be resolved."""
+        return not self.is_external() and not self.is_anchor()
 
-        return contexts
 
-    def _build_page_slug_map(
-        self, contexts: list[PageContext], site_config: ScribeConfig
-    ) -> dict[str, str]:
-        """Build a mapping of page paths/titles to their final URLs."""
-        page_slug_map: dict[str, str] = {}
+class UrlBuilder:
+    """Builds final URLs for page contexts based on site configuration."""
 
-        for ctx in contexts:
-            # Get the final URL for this context
-            final_url = self._get_final_url_for_context(ctx, site_config)
-
-            # Map relative path (without extension) to final URL
-            relative_path_no_ext = str(ctx.relative_path.with_suffix(""))
-            page_slug_map[relative_path_no_ext] = final_url
-
-            # Map filename (without extension) to final URL
-            filename_no_ext = ctx.source_path.stem
-            page_slug_map[filename_no_ext] = final_url
-
-            # If we have a title, map title to final URL as well
-            if ctx.title:
-                page_slug_map[ctx.title] = final_url
-
-            logger.debug(f"Mapped page {relative_path_no_ext} -> {final_url}")
-
-        return page_slug_map
-
-    def _get_final_url_for_context(
-        self, ctx: PageContext, site_config: ScribeConfig
-    ) -> str:
-        """Get the final URL for a context based on template configuration."""
+    def build_url(self, ctx: PageContext, site_config: ScribeConfig) -> str:
+        """Build the final URL for a page context."""
         if not site_config.templates or not site_config.templates.note_templates:
-            # Default: use the slug with leading slash
             return f"/{ctx.slug}/"
 
-        # Find the matching template for this context
+        # Find matching template
         for template in site_config.templates.note_templates:
-            if self._note_matches_template(ctx, template, site_config):
+            if self._matches_template(ctx, template, site_config):
                 url_pattern = template.url_pattern
                 if "{slug}" in url_pattern:
                     return url_pattern.replace("{slug}", ctx.slug or "untitled")
 
-        # Default: use the slug with leading slash
         return f"/{ctx.slug}/"
 
-    def _note_matches_template(
+    def _matches_template(
         self, ctx: PageContext, template, site_config: ScribeConfig
     ) -> bool:
-        """Check if a note context matches a template's predicates."""
-        # If no predicates, match all
+        """Check if a context matches a template's predicates."""
         if not template.predicates:
             return True
 
-        # Import the predicate matcher to do proper matching
         from scribe.predicates import PredicateMatcher
 
         predicate_matcher = PredicateMatcher()
         return predicate_matcher.matches_predicates(ctx, tuple(template.predicates))
 
-    def _resolve_links_in_content(
-        self, content: str, ctx: PageContext, page_slug_map: dict[str, str]
-    ) -> str:
-        """Resolve markdown and HTML links in content to actual page URLs."""
 
-        # First, resolve any remaining markdown links
-        def replace_markdown_link(match):
-            link_text = match.group(1)
-            link_url = match.group(2)
+class LinkResolver:
+    """Resolves page links to actual URLs using multiple strategies."""
 
-            # Skip external links (http/https/mailto/etc)
-            if self._is_external_link(link_url):
-                return match.group(0)  # Return unchanged
+    def __init__(self, slug_map: dict[str, str]) -> None:
+        self.slug_map = slug_map
 
-            # Skip anchor links
-            if link_url.startswith("#"):
-                return match.group(0)  # Return unchanged
+    def resolve(self, link: PageLink, ctx: PageContext) -> str:
+        """Resolve a page link to its final URL."""
+        if not link.should_resolve():
+            return link.url
 
-            # Try to resolve the link
-            resolved_url = self._resolve_page_link(link_url, ctx, page_slug_map)
-            if resolved_url != link_url:
-                logger.debug(f"Resolved markdown link: {link_url} -> {resolved_url}")
-                return f"[{link_text}]({resolved_url})"
+        cleaned_url = self._clean_url(link.url)
 
-            return match.group(0)  # Return unchanged if no resolution
+        # Try different resolution strategies in order
+        strategies = [
+            self._direct_lookup,
+            self._relative_path_resolution,
+        ]
 
-        content = self.markdown_link_pattern.sub(replace_markdown_link, content)
+        for strategy in strategies:
+            resolved_url = strategy(cleaned_url, ctx)
+            if resolved_url:
+                return resolved_url
 
-        # Then, parse and resolve HTML links using Beautiful Soup
-        content = self._resolve_html_links(content, ctx, page_slug_map)
+        # No resolution found - return original or with .md extension
+        return cleaned_url + (".md" if not link.is_external() else "")
 
-        return content
+    def _clean_url(self, url: str) -> str:
+        """Clean and normalize a URL."""
+        url = url.strip()
+        if url.endswith(".md"):
+            url = url[:-3]
+        return url
 
-    def _resolve_html_links(
-        self, content: str, ctx: PageContext, page_slug_map: dict[str, str]
-    ) -> str:
-        """Resolve HTML links using Beautiful Soup for proper parsing."""
+    def _direct_lookup(self, url: str, ctx: PageContext) -> str | None:
+        """Try direct lookup in slug map."""
+        return self.slug_map.get(url)
+
+    def _relative_path_resolution(self, url: str, ctx: PageContext) -> str | None:
+        """Try relative path resolution."""
+        if not (url.startswith("./") or url.startswith("../")):
+            return None
+
         try:
-            # Parse the HTML content
+            current_dir = ctx.relative_path.parent
+            target_path = current_dir / url
+            normalized_path = str(target_path).replace("\\", "/")
+
+            if normalized_path.startswith("./"):
+                normalized_path = normalized_path[2:]
+
+            # Try full path first
+            resolved_url = self.slug_map.get(normalized_path)
+            if resolved_url:
+                return resolved_url
+
+            # Try just filename
+            filename_only = Path(normalized_path).name
+            return self.slug_map.get(filename_only)
+
+        except Exception as e:
+            logger.debug(f"Error resolving relative path {url}: {e}")
+            return None
+
+
+class HtmlLinkProcessor:
+    """Processes HTML anchor tags with href attributes."""
+
+    def __init__(self, resolver: LinkResolver) -> None:
+        self.resolver = resolver
+
+    def process(self, content: str, ctx: PageContext) -> str:
+        """Process HTML links in content."""
+        try:
             soup = BeautifulSoup(content, "html.parser")
 
-            # Find all anchor tags with href attributes
-            for link in soup.find_all("a", href=True):
-                href = link["href"]
+            for anchor in soup.find_all("a", href=True):
+                href = anchor["href"]
+                link = PageLink(url=href)
+                resolved_url = self.resolver.resolve(link, ctx)
 
-                # Skip external links (http/https/mailto/etc)
-                if self._is_external_link(href):
-                    continue
-
-                # Skip anchor links
-                if href.startswith("#"):
-                    continue
-
-                # Try to resolve the link
-                resolved_url = self._resolve_page_link(href, ctx, page_slug_map)
                 if resolved_url != href:
                     logger.debug(f"Resolved HTML link: {href} -> {resolved_url}")
-                    link["href"] = resolved_url
+                    anchor["href"] = resolved_url
 
-            # Return the modified HTML
             return str(soup)
 
         except Exception as e:
             logger.warning(f"Error parsing HTML content for link resolution: {e}")
-            # Fall back to returning original content if parsing fails
             return content
 
-    def _is_external_link(self, url: str) -> bool:
-        """Check if a URL is an external link."""
-        return url.startswith(("http://", "https://", "mailto:", "ftp://", "//"))
 
-    def _resolve_page_link(
-        self, link_url: str, ctx: PageContext, page_slug_map: dict[str, str]
-    ) -> str:
-        """Resolve a page link to the actual URL."""
-        # Clean up the link URL
-        link_url = link_url.strip()
+class PageSlugMapBuilder:
+    """Builds the slug mapping from page contexts."""
 
-        # Remove .md extension if present
-        if link_url.endswith(".md"):
-            link_url = link_url[:-3]
+    def __init__(self, url_builder: UrlBuilder) -> None:
+        self.url_builder = url_builder
 
-        # Try direct lookup in our slug map
-        if link_url in page_slug_map:
-            return page_slug_map[link_url]
+    def build(
+        self, contexts: list[PageContext], site_config: ScribeConfig
+    ) -> dict[str, str]:
+        """Build a slug map from page contexts."""
+        slug_map: dict[str, str] = {}
 
-        # Try relative path resolution
-        resolved_link = self._try_relative_path_resolution(link_url, ctx, page_slug_map)
-        if resolved_link:
-            return resolved_link
+        for ctx in contexts:
+            final_url = self.url_builder.build_url(ctx, site_config)
 
-        # If no resolution found, return original (or add .md back if it was removed)
-        return link_url + (".md" if not self._is_external_link(link_url) else "")
+            # Add different mappings for the same URL
+            mappings = self._get_mappings_for_context(ctx)
+            for mapping in mappings:
+                slug_map[mapping] = final_url
 
-    def _try_relative_path_resolution(
-        self, link_url: str, ctx: PageContext, page_slug_map: dict[str, str]
-    ) -> str | None:
-        """Try to resolve a link using relative path logic."""
-        # Handle relative paths like ./other-page or ../other-page
-        if link_url.startswith("./") or link_url.startswith("../"):
-            try:
-                # Get the directory of the current page
-                current_dir = ctx.relative_path.parent
+            logger.debug(
+                f"Mapped page {ctx.relative_path.with_suffix('')} -> {final_url}"
+            )
 
-                # Resolve the relative path (but keep it as relative)
-                target_path = current_dir / link_url
+        return slug_map
 
-                # Normalize the path to remove . and .. components
-                # Convert to string and back to Path to normalize
-                normalized_path = str(target_path).replace("\\", "/")
-                # Remove leading ./ if present
-                if normalized_path.startswith("./"):
-                    normalized_path = normalized_path[2:]
+    def _get_mappings_for_context(self, ctx: PageContext) -> list[str]:
+        """Get all possible mappings for a context."""
+        mappings = []
 
-                # Try to find this path in our slug map
-                if normalized_path in page_slug_map:
-                    return page_slug_map[normalized_path]
+        # Relative path without extension
+        relative_path_no_ext = str(ctx.relative_path.with_suffix(""))
+        mappings.append(relative_path_no_ext)
 
-                # Also try just the filename without directory
-                filename_only = Path(normalized_path).name
-                if filename_only in page_slug_map:
-                    return page_slug_map[filename_only]
+        # Filename without extension
+        filename_no_ext = ctx.source_path.stem
+        mappings.append(filename_no_ext)
 
-            except Exception as e:
-                logger.debug(f"Error resolving relative path {link_url}: {e}")
+        # Title if available
+        if ctx.title:
+            mappings.append(ctx.title)
 
-        return None
+        return mappings
+
+
+class LinkResolutionBuildPlugin(BuildPlugin[LinkResolutionBuildPluginConfig]):
+    """Build plugin to resolve HTML page links to actual slug destinations."""
+
+    def __init__(self, config: LinkResolutionBuildPluginConfig) -> None:
+        super().__init__(config)
+        self.name = "link_resolution"
+
+    async def after_notes(
+        self, site_config: ScribeConfig, output_dir: Path, contexts: list[PageContext]
+    ) -> list[PageContext]:
+        """Process all notes to resolve page links to actual slugs."""
+        # Build the slug mapping
+        url_builder = UrlBuilder()
+        slug_map_builder = PageSlugMapBuilder(url_builder)
+        slug_map = slug_map_builder.build(contexts, site_config)
+
+        logger.info(f"Built link resolution map with {len(slug_map)} entries")
+
+        # Set up link processing
+        resolver = LinkResolver(slug_map)
+        processor = HtmlLinkProcessor(resolver)
+
+        # Process each context
+        for ctx in contexts:
+            ctx.content = processor.process(ctx.content, ctx)
+
+        return contexts
