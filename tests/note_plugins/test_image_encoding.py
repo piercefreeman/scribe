@@ -535,8 +535,13 @@ class TestImageEncodingPlugin:
         temp_dir: Path,
         site_config: ScribeConfig,
     ) -> None:
-        """Test that multiple responsive sizes are actually generated for large images."""
-        # Create config with explicit responsive sizes - use smaller, more realistic sizes for testing
+        """
+        Test that multiple responsive sizes are actually generated
+        for large images.
+
+        """
+        # Create config with explicit responsive sizes - use smaller,
+        # more realistic sizes for testing
         config = ImageEncodingPluginConfig(
             name="image_encoding",
             cache_dir=str(temp_dir / "cache"),
@@ -547,7 +552,8 @@ class TestImageEncodingPlugin:
             verbose=True,  # Enable verbose logging to see what's happening
         )
 
-        # Create a reasonably sized test image (1800x1200) - large enough for all responsive sizes
+        # Create a reasonably sized test image (1800x1200) - large enough for
+        # all responsive sizes
         # Use a simple solid color image to avoid complex pattern issues
         img = pyvips.Image.black(1800, 1200, bands=3)
         # Add some color to make it a valid RGB image
@@ -581,7 +587,6 @@ class TestImageEncodingPlugin:
         print(f"Generated sizes: {sorted(generated_sizes)}")
 
         # Should have generated multiple sizes (all that fit within 1800px width)
-        expected_sizes = [400, 600, 800, 1200]  # All should fit in 1800px
         assert len(generated_sizes) >= 3, (
             f"Expected at least 3 sizes, got {len(generated_sizes)}: {generated_sizes}"
         )

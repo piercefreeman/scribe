@@ -354,14 +354,21 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
             # Convert grayscale to RGB
             img = img.colourspace("srgb")
         elif img.bands == 4:
-            # Convert RGBA to RGB by flattening with white background
-            img = img.flatten(background=[255, 255, 255])
+            # Keep RGBA as-is since WebP supports transparency
+            # Just ensure it's in the right colorspace
+            if img.interpretation != "srgb":
+                img = img.colourspace("srgb")
         elif img.bands > 4:
-            # Take only the first 3 bands if there are more than 4
-            img = img[:3]
+            # Take only the first 4 bands if there are more than 4 (RGBA)
+            img = img[:4]
+            if img.interpretation != "srgb":
+                img = img.colourspace("srgb")
+        elif img.bands == 2:
+            # Convert grayscale with alpha to RGBA
+            img = img.colourspace("srgb")
 
-        # Ensure we have exactly 3 bands (RGB)
-        if img.bands != 3:
+        # For RGB images (3 bands), ensure proper colorspace
+        if img.bands == 3 and img.interpretation != "srgb":
             img = img.colourspace("srgb")
 
         # Convert to sequential access for better memory efficiency with large images
