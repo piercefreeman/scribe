@@ -34,6 +34,9 @@ class ImageEncodingData(BaseModel):
 
     processed_images: dict[str, list[str]]
     formats: list[str]
+    # Simplified responsive image data (WebP only)
+    responsive_images: dict[str, dict[int, str]] = {}  # {src: {width: path}}
+    image_dimensions: dict[str, tuple[int, int]] = {}  # {src: (width, height)}
 
 
 class FrontmatterData(BaseModel):

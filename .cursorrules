@@ -15,3 +15,4 @@ are using valid Python. Run `make lint` to run our full linting pipeline.
 Some general coding conventions you should obey:
 - Don't nest functions in other functions. Prefer partial() to embedding nested functions. In the rare situation that it's really cleaner to nest functions (some recursive calls potentially), justify the nesting via a comment.
 - When if statements with a large amount of logic, consider whether it's better to terminate out the function early by checking the if(inverse condition) and then just returning
+- You shouldn't shy away from raising exceptions loudly. If there's an issue with some logic we'd rather the user know and fail early. Justify why you need to wrap ANY code with try/catches - instead of just letting a higher layer of abstraction take care of it.

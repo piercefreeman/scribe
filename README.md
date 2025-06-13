@@ -12,11 +12,13 @@ A static site generator with an extendable plugin architecture. I use this to po
 ## Quick Start
 
 1. Initialize a new project:
+
 ```bash
 uv run scribe init
 ```
 
-2. Start the development server:
+2. Start the development server. If you're running on a new device that doesn't yet have an image cache, you can expect this to take some time as we convert all of your images into responsive formats. See the `image_encoding` plugin for more details.
+
 ```bash
 uv run scribe dev
 ```

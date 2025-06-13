@@ -79,6 +79,8 @@ class LinkResolver:
         if not link.should_resolve():
             return link.url
 
+        original_url = link.url.strip()
+        was_md_link = original_url.endswith(".md")
         cleaned_url = self._clean_url(link.url)
 
         # Try different resolution strategies in order
@@ -91,6 +93,11 @@ class LinkResolver:
             resolved_url = strategy(cleaned_url, ctx)
             if resolved_url:
                 return resolved_url
+
+        # If original link was a .md file but we couldn't resolve it,
+        # check if file exists
+        if was_md_link:
+            self._check_md_file_exists(original_url, ctx)
 
         # No resolution found - return original or with .md extension
         return cleaned_url + (".md" if not link.is_external() else "")
@@ -111,26 +118,42 @@ class LinkResolver:
         if not (url.startswith("./") or url.startswith("../")):
             return None
 
-        try:
-            current_dir = ctx.relative_path.parent
-            target_path = current_dir / url
-            normalized_path = str(target_path).replace("\\", "/")
+        current_dir = ctx.relative_path.parent
+        target_path = current_dir / url
+        normalized_path = str(target_path).replace("\\", "/")
 
-            if normalized_path.startswith("./"):
-                normalized_path = normalized_path[2:]
+        if normalized_path.startswith("./"):
+            normalized_path = normalized_path[2:]
 
-            # Try full path first
-            resolved_url = self.slug_map.get(normalized_path)
-            if resolved_url:
-                return resolved_url
+        # Try full path first
+        resolved_url = self.slug_map.get(normalized_path)
+        if resolved_url:
+            return resolved_url
 
-            # Try just filename
-            filename_only = Path(normalized_path).name
-            return self.slug_map.get(filename_only)
+        # Try just filename
+        filename_only = Path(normalized_path).name
+        return self.slug_map.get(filename_only)
 
-        except Exception as e:
-            logger.debug(f"Error resolving relative path {url}: {e}")
-            return None
+    def _check_md_file_exists(self, original_url: str, ctx: PageContext) -> None:
+        """Check if a .md file exists on disk and raise exception if not."""
+        # Handle different types of paths
+        if original_url.startswith("./") or original_url.startswith("../"):
+            # Relative path
+            current_dir = ctx.source_path.parent
+            target_path = current_dir / original_url
+            resolved_path = target_path.resolve()
+        else:
+            # Assume it's relative to the current file's directory
+            current_dir = ctx.source_path.parent
+            target_path = current_dir / original_url
+            resolved_path = target_path.resolve()
+
+        if not resolved_path.exists():
+            raise FileNotFoundError(
+                f"Markdown file not found: '{original_url}' "
+                f"referenced in '{ctx.source_path}'. "
+                f"Resolved path: '{resolved_path}'"
+            )
 
 
 class HtmlLinkProcessor:
@@ -141,23 +164,18 @@ class HtmlLinkProcessor:
 
     def process(self, content: str, ctx: PageContext) -> str:
         """Process HTML links in content."""
-        try:
-            soup = BeautifulSoup(content, "html.parser")
+        soup = BeautifulSoup(content, "html.parser")
 
-            for anchor in soup.find_all("a", href=True):
-                href = anchor["href"]
-                link = PageLink(url=href)
-                resolved_url = self.resolver.resolve(link, ctx)
+        for anchor in soup.find_all("a", href=True):
+            href = anchor["href"]
+            link = PageLink(url=href)
+            resolved_url = self.resolver.resolve(link, ctx)
 
-                if resolved_url != href:
-                    logger.debug(f"Resolved HTML link: {href} -> {resolved_url}")
-                    anchor["href"] = resolved_url
+            if resolved_url != href:
+                logger.debug(f"Resolved HTML link: {href} -> {resolved_url}")
+                anchor["href"] = resolved_url
 
-            return str(soup)
-
-        except Exception as e:
-            logger.warning(f"Error parsing HTML content for link resolution: {e}")
-            return content
+        return str(soup)
 
 
 class PageSlugMapBuilder:

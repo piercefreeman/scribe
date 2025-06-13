@@ -13,7 +13,6 @@ class PluginName(PluginNameEnum):
 
     FRONTMATTER = "frontmatter"
     FOOTNOTES = "footnotes"
-    LINK_RESOLUTION = "link_resolution"
     MARKDOWN = "markdown"
     DATE = "date"
     SCREENSHOT = "screenshot"
@@ -54,21 +53,6 @@ class FootnotesPluginConfig(BaseNotePluginConfig):
     """
 
     name: Literal[PluginName.FOOTNOTES] = PluginName.FOOTNOTES
-    before_dependencies: list[PluginName] = [PluginName.MARKDOWN]
-
-
-class LinkResolutionPluginConfig(BaseNotePluginConfig):
-    """Configuration for the link resolution plugin.
-
-    Example YAML configuration:
-    ```yaml
-    link_resolution:
-      name: link_resolution
-      enabled: true
-    ```
-    """
-
-    name: Literal[PluginName.LINK_RESOLUTION] = PluginName.LINK_RESOLUTION
     before_dependencies: list[PluginName] = [PluginName.MARKDOWN]
 
 
@@ -169,21 +153,26 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
         - "avif"
         - "webp"
       quality_avif: 65
-      quality_webp: 80
+      quality_webp: 85
       max_width: null
       max_height: null
       generate_responsive: true
       responsive_sizes:
-        - 480
-        - 768
-        - 1024
+        - 400
+        - 600
+        - 800
         - 1200
+        - 1600
+        - 2400
+      default_sizes: "(max-width: 400px) 100vw, (max-width: 800px) 50vw, 33vw"
+      use_picture_element: true
+      add_loading_lazy: true
       verbose: false
     ```
     """
 
     name: Literal[PluginName.IMAGE_ENCODING] = PluginName.IMAGE_ENCODING
-    before_dependencies: list[PluginName] = [PluginName.MARKDOWN]
+    after_dependencies: list[PluginName] = [PluginName.MARKDOWN]
 
     cache_dir: Path = Field(
         default=Path(".image_cache"), description="Directory to cache processed images"
@@ -196,7 +185,7 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
         default=65, ge=1, le=100, description="AVIF quality setting (1-100)"
     )
     quality_webp: int = Field(
-        default=80, ge=1, le=100, description="WebP quality setting (1-100)"
+        default=85, ge=1, le=100, description="WebP quality setting (1-100)"
     )
     max_width: int | None = Field(
         default=None, description="Maximum width for resizing images"
@@ -208,8 +197,18 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
         default=True, description="Generate responsive image sizes"
     )
     responsive_sizes: list[int] = Field(
-        default_factory=lambda: [480, 768, 1024, 1200],
-        description="Responsive image widths to generate",
+        default_factory=lambda: [400, 600, 800, 1200, 1600, 2400],
+        description="Responsive image widths to generate (retina-optimized)",
+    )
+    default_sizes: str = Field(
+        default="(max-width: 400px) 100vw, (max-width: 800px) 50vw, 33vw",
+        description="Default sizes attribute for responsive images",
+    )
+    use_picture_element: bool = Field(
+        default=True, description="Use <picture> element for enhanced browser support"
+    )
+    add_loading_lazy: bool = Field(
+        default=True, description="Add loading='lazy' to img elements"
     )
     verbose: bool = Field(default=False, description="Enable verbose logging")
 
@@ -217,7 +216,6 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
 PluginConfig = Annotated[
     FrontmatterPluginConfig
     | FootnotesPluginConfig
-    | LinkResolutionPluginConfig
     | MarkdownPluginConfig
     | DatePluginConfig
     | ScreenshotPluginConfig

@@ -177,6 +177,35 @@ class TestLinkResolver:
         result = resolver.resolve(link, sample_context)
         assert result == "#header"
 
+    def test_resolve_md_file_not_found_raises_exception(self):
+        """Test that missing .md files raise FileNotFoundError."""
+        slug_map = {"existing.md": "/existing/"}
+        resolver = LinkResolver(slug_map)
+
+        # Create a temporary directory structure for testing
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            source_file = temp_path / "test.md"
+            source_file.touch()  # Create the source file
+
+            # Create a context with the source file
+            ctx = PageContext(
+                source_path=source_file,
+                relative_path=Path("test.md"),
+                output_path=temp_path / "output" / "test.html",
+                content="",
+                raw_content="",
+                slug="test",
+            )
+
+            # Test that non-existent .md file raises exception
+            link = PageLink(url="nonexistent.md")
+
+            with pytest.raises(FileNotFoundError, match="Markdown file not found"):
+                resolver.resolve(link, ctx)
+
 
 class TestHtmlLinkProcessor:
     """Test the HtmlLinkProcessor."""
