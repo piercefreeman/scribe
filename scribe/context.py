@@ -34,10 +34,8 @@ class ImageEncodingData(BaseModel):
 
     processed_images: dict[str, list[str]]
     formats: list[str]
-    # Enhanced responsive image data
-    responsive_images: dict[
-        str, dict[str, dict[int, str]]
-    ] = {}  # {src: {format: {width: path}}}
+    # Simplified responsive image data (WebP only)
+    responsive_images: dict[str, dict[int, str]] = {}  # {src: {width: path}}
     image_dimensions: dict[str, tuple[int, int]] = {}  # {src: (width, height)}
 
 

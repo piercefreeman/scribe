@@ -35,7 +35,7 @@ dependencies = [
     "jinja2>=3.0.0",
     "beautifulsoup4>=4.13.4",
     "pillow>=10.0.0",
-    "pyvips>=3.0.0",
+    "pyvips[binary]>=3.0.0",
 ]
 
 [project.optional-dependencies]

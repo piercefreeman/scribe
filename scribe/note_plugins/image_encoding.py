@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 
 class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
-    """Plugin that processes and optimizes images with responsive sizing."""
+    """Plugin that processes and optimizes images with responsive sizing using WebP."""
 
     name = PluginName.IMAGE_ENCODING
 
@@ -32,29 +32,32 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
     ) -> None:
         super().__init__(config)
         self.global_config = global_config
-        self._check_format_support()
+        self.supports_webp = self._test_webp_support()
 
-    def _check_format_support(self) -> None:
-        """Check which formats are supported by libvips."""
-        self.supports_avif = self._test_format_support("avif")
-        self.supports_webp = self._test_format_support("webp")
+        if self.supports_webp:
+            logger.info("WebP encoding is supported")
+        else:
+            logger.warning("WebP encoding is not supported by libvips")
 
-    def _test_format_support(self, format_name: str) -> bool:
-        """Test if libvips supports a specific format."""
+    def _test_webp_support(self) -> bool:
+        """Test if libvips supports WebP encoding."""
         try:
-            # Create a small test image and try to save it
-            test_img = pyvips.Image.black(1, 1)
-            with tempfile.NamedTemporaryFile(
-                suffix=f".{format_name}", delete=False
-            ) as tmp_file:
-                test_img.write_to_file(tmp_file.name)
+            # Create a small test image and try to encode it to WebP
+            test_img = pyvips.Image.black(10, 10, bands=3)
+            with tempfile.NamedTemporaryFile(suffix=".webp", delete=False) as tmp_file:
+                # Try to encode using write_to_file with .webp extension
+                test_img.write_to_file(tmp_file.name, Q=80)
                 os.unlink(tmp_file.name)
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug(f"WebP not supported: {e}")
             return False
 
     async def process(self, ctx: PageContext) -> PageContext:
         """Process images referenced in the page content."""
+        if not self.supports_webp:
+            logger.warning("WebP not supported, skipping image processing")
+            return ctx
 
         # Find image references in HTML content (since we run after markdown)
         image_refs = self._extract_html_image_references(ctx.content)
@@ -75,7 +78,6 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Process each image
-        processed_images = {}
         responsive_images = {}
         image_dimensions = {}
 
@@ -83,8 +85,7 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
             try:
                 result = await self._process_image_responsive(img_src, cache_dir, ctx)
                 if result:
-                    formats, responsive_data, dimensions = result
-                    processed_images[img_src] = formats
+                    responsive_data, dimensions = result
                     responsive_images[img_src] = responsive_data
                     image_dimensions[img_src] = dimensions
             except Exception as e:
@@ -92,15 +93,15 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
         # Store processed image info as typed attribute
         ctx.image_encoding_data = ImageEncodingData(
-            processed_images=processed_images,
-            formats=self.config.formats,
+            processed_images={k: ["webp"] for k in responsive_images.keys()},
+            formats=["webp"],
             responsive_images=responsive_images,
             image_dimensions=image_dimensions,
         )
 
         # Rewrite HTML image tags to use picture elements
-        if processed_images:
-            ctx.content = self._rewrite_html_to_picture_elements(
+        if responsive_images:
+            ctx.content = self._rewrite_html_to_responsive_images(
                 ctx.content, responsive_images, image_dimensions, ctx
             )
 
@@ -126,7 +127,7 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
     async def _process_image_responsive(
         self, img_src: str, cache_dir: Path, ctx: PageContext
-    ) -> tuple[list[str], dict[str, dict[int, str]], tuple[int, int]] | None:
+    ) -> tuple[dict[int, str], tuple[int, int]] | None:
         """Process a single image and return responsive data."""
         # Find the source image
         source_path = self._find_image_path(img_src, ctx)
@@ -153,84 +154,53 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
             img = self._prepare_image(img)
             original_dimensions = img.width, img.height
 
-            # Generate responsive sizes and formats
-            processed_formats = []
+            # Generate responsive sizes
             responsive_data = {}
+            sizes_to_generate = []
 
-            for format_name in self.config.formats:
-                if not self._format_supported(format_name):
-                    continue
+            if self.config.generate_responsive:
+                # Add responsive sizes smaller than or equal to original
+                for size in self.config.responsive_sizes:
+                    if size <= img.width:
+                        sizes_to_generate.append(size)
 
-                responsive_data[format_name] = {}
-                format_processed = False
+                # Always include original size if no responsive sizes fit
+                if not sizes_to_generate:
+                    sizes_to_generate.append(img.width)
+                # Also add original size if it's not already included
+                elif img.width not in sizes_to_generate:
+                    sizes_to_generate.append(img.width)
+            else:
+                # Just use original size
+                sizes_to_generate.append(img.width)
 
-                if self.config.generate_responsive:
-                    # Generate responsive sizes for this image
-                    sizes_to_generate = []
-
-                    # Add responsive sizes smaller than or equal to original
-                    for size in self.config.responsive_sizes:
-                        if size <= img.width:
-                            sizes_to_generate.append(size)
-
-                    # Always include original size if no responsive sizes fit
-                    if not sizes_to_generate:
-                        sizes_to_generate.append(img.width)
-                    # Also add original size if it's not already included
-                    elif img.width not in sizes_to_generate:
-                        sizes_to_generate.append(img.width)
-
-                    # Generate all applicable sizes
-                    for size in sizes_to_generate:
-                        if self._process_responsive_format(
-                            img, format_name, size, source_path, image_cache_dir, ctx
-                        ):
-                            responsive_data[format_name][size] = (
-                                self._get_responsive_path(
-                                    source_path, format_name, size, ctx
-                                )
-                            )
-                            format_processed = True
-                else:
-                    # Generate single size (original dimensions)
-                    if self._process_format(
-                        img, format_name, source_path, image_cache_dir, ctx
-                    ):
-                        responsive_data[format_name][original_dimensions[0]] = (
-                            self._get_converted_path(source_path, format_name, ctx)
-                        )
-                        format_processed = True
-
-                if format_processed:
-                    processed_formats.append(format_name)
+            # Generate all sizes
+            for size in sizes_to_generate:
+                if self._process_responsive_size(
+                    img, size, source_path, image_cache_dir, ctx
+                ):
+                    responsive_data[size] = self._get_responsive_path(
+                        source_path, size, ctx
+                    )
 
             # Copy cache to output
             await self._copy_cache_to_output(image_cache_dir, source_path, ctx)
 
-            return processed_formats, responsive_data, original_dimensions
+            return responsive_data, original_dimensions
 
         except Exception as e:
             logger.error(f"Error processing image {source_path}: {e}")
             return None
 
-    def _format_supported(self, format_name: str) -> bool:
-        """Check if format is supported."""
-        if format_name == "avif":
-            return self.supports_avif
-        elif format_name == "webp":
-            return self.supports_webp
-        return False
-
-    def _process_responsive_format(
+    def _process_responsive_size(
         self,
         img: pyvips.Image,
-        format_name: str,
         target_width: int,
         source_path: Path,
         cache_dir: Path,
         ctx: PageContext,
     ) -> bool:
-        """Process image in a specific format and size."""
+        """Process image to a specific width."""
         try:
             # Skip if target width is larger than original
             if target_width > img.width:
@@ -250,77 +220,24 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
             # Save to cache using slug-based naming
             base_name = ctx.generate_slug_from_text(source_path.stem)
-            output_file = cache_dir / f"{base_name}-{target_width}.{format_name}"
+            output_file = cache_dir / f"{base_name}-{target_width}.webp"
 
             if self.config.verbose:
-                logger.debug(f"Saving responsive {format_name} file: {output_file}")
+                logger.debug(f"Saving WebP file: {output_file}")
 
-            # Set quality for the format
-            if format_name == "avif":
-                processed_img.write_to_file(
-                    str(output_file), Q=self.config.quality_avif
-                )
-            else:  # webp
-                processed_img.write_to_file(
-                    str(output_file), Q=self.config.quality_webp
-                )
-
+            # Save as WebP
+            processed_img.write_to_file(str(output_file), Q=self.config.quality_webp)
             return True
 
         except Exception as e:
-            logger.error(
-                f"Error saving responsive {format_name} format at {target_width}w: {e}"
-            )
-            return False
-
-    def _process_format(
-        self,
-        img: pyvips.Image,
-        format_name: str,
-        source_path: Path,
-        cache_dir: Path,
-        ctx: PageContext,
-    ) -> bool:
-        """Process image in a specific format (single size)."""
-        try:
-            # Resize if needed
-            processed_img = img
-            if self.config.max_width and img.width > self.config.max_width:
-                scale = self.config.max_width / img.width
-                processed_img = processed_img.resize(scale)
-
-            if self.config.max_height and processed_img.height > self.config.max_height:
-                scale = self.config.max_height / processed_img.height
-                processed_img = processed_img.resize(scale)
-
-            # Save to cache using slug-based naming
-            base_name = ctx.generate_slug_from_text(source_path.stem)
-            output_file = cache_dir / f"{base_name}.{format_name}"
-
-            # Set quality for the format
-            if format_name == "avif":
-                processed_img.write_to_file(
-                    str(output_file), Q=self.config.quality_avif
-                )
-            else:  # webp
-                processed_img.write_to_file(
-                    str(output_file), Q=self.config.quality_webp
-                )
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error saving {format_name} format: {e}")
+            logger.error(f"Error processing image at {target_width}w: {e}")
             return False
 
     def _get_cached_responsive_data(
         self, cache_dir: Path, source_path: Path, ctx: PageContext
-    ) -> tuple[list[str], dict[str, dict[int, str]], tuple[int, int]]:
+    ) -> tuple[dict[int, str], tuple[int, int]]:
         """Get responsive data from cached files."""
-        processed_formats = []
         responsive_data = {}
-
-        # Try to get original dimensions from a cached file
         original_dimensions = (1024, 768)  # fallback
 
         # Get directory structure for URL generation
@@ -338,45 +255,14 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
         output_dir = output_relative_path.parent
 
-        for format_name in self.config.formats:
-            if not self._format_supported(format_name):
-                continue
-
-            extension = f".{format_name}"
-            responsive_data[format_name] = {}
-
-            # Find all cached files for this format
-            for cached_file in cache_dir.glob(f"*{extension}"):
-                # Extract width from filename (e.g., "image-480.webp" -> 480)
-                name_part = cached_file.stem
-                if "-" in name_part:
-                    try:
-                        width = int(name_part.split("-")[-1])
-                        # Generate proper URL path with slug-based directory names
-                        if output_dir != Path(".") and str(output_dir) != ".":
-                            dir_parts = []
-                            for part in output_dir.parts:
-                                slug_part = ctx.generate_slug_from_text(part)
-                                dir_parts.append(slug_part)
-                            output_dir_str = "/".join(dir_parts)
-                            path = f"/{output_dir_str}/{cached_file.name}"
-                        else:
-                            path = f"/{cached_file.name}"
-                        responsive_data[format_name][width] = path.replace("\\", "/")
-                    except ValueError:
-                        # Fallback for non-responsive files
-                        if output_dir != Path(".") and str(output_dir) != ".":
-                            dir_parts = []
-                            for part in output_dir.parts:
-                                slug_part = ctx.generate_slug_from_text(part)
-                                dir_parts.append(slug_part)
-                            output_dir_str = "/".join(dir_parts)
-                            path = f"/{output_dir_str}/{cached_file.name}"
-                        else:
-                            path = f"/{cached_file.name}"
-                        responsive_data[format_name][1024] = path.replace("\\", "/")
-                else:
-                    # Non-responsive file
+        # Find all cached WebP files
+        for cached_file in cache_dir.glob("*.webp"):
+            # Extract width from filename (e.g., "image-480.webp" -> 480)
+            name_part = cached_file.stem
+            if "-" in name_part:
+                try:
+                    width = int(name_part.split("-")[-1])
+                    # Generate proper URL path with slug-based directory names
                     if output_dir != Path(".") and str(output_dir) != ".":
                         dir_parts = []
                         for part in output_dir.parts:
@@ -386,12 +272,21 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
                         path = f"/{output_dir_str}/{cached_file.name}"
                     else:
                         path = f"/{cached_file.name}"
-                    responsive_data[format_name][1024] = path.replace("\\", "/")
+                    responsive_data[width] = path.replace("\\", "/")
+                except ValueError:
+                    # Fallback for non-responsive files
+                    if output_dir != Path(".") and str(output_dir) != ".":
+                        dir_parts = []
+                        for part in output_dir.parts:
+                            slug_part = ctx.generate_slug_from_text(part)
+                            dir_parts.append(slug_part)
+                        output_dir_str = "/".join(dir_parts)
+                        path = f"/{output_dir_str}/{cached_file.name}"
+                    else:
+                        path = f"/{cached_file.name}"
+                    responsive_data[1024] = path.replace("\\", "/")
 
-            if responsive_data[format_name]:
-                processed_formats.append(format_name)
-
-        return processed_formats, responsive_data, original_dimensions
+        return responsive_data, original_dimensions
 
     def _find_image_path(self, img_src: str, ctx: PageContext) -> Path | None:
         """Find the actual path to an image."""
@@ -521,9 +416,9 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
         return Path(source_path.name)
 
     def _get_responsive_path(
-        self, source_path: Path, format_name: str, width: int, ctx: PageContext
+        self, source_path: Path, width: int, ctx: PageContext
     ) -> str:
-        """Get the responsive image path for a given source image, format, and width."""
+        """Get the responsive image path for a given source image and width."""
         # Get the base name without extension and convert to proper slug
         base_name = ctx.generate_slug_from_text(source_path.stem)
 
@@ -538,46 +433,21 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
                 slug_part = ctx.generate_slug_from_text(part)
                 dir_parts.append(slug_part)
             output_dir_str = "/".join(dir_parts)
-            path = f"/{output_dir_str}/{base_name}-{width}.{format_name}"
+            path = f"/{output_dir_str}/{base_name}-{width}.webp"
         else:
-            path = f"/{base_name}-{width}.{format_name}"
+            path = f"/{base_name}-{width}.webp"
 
         # Normalize path separators for URLs
         return path.replace("\\", "/")
 
-    def _get_converted_path(
-        self, source_path: Path, format_name: str, ctx: PageContext
-    ) -> str:
-        """Get the converted image path for a given source image and format."""
-        # Get the base name without extension and convert to proper slug
-        base_name = ctx.generate_slug_from_text(source_path.stem)
-
-        # Find the source path to determine output location
-        output_relative_path = self._get_output_path(source_path, ctx)
-        output_dir = output_relative_path.parent
-
-        # Convert directory path components to proper slugs
-        if output_dir != Path(".") and str(output_dir) != ".":
-            dir_parts = []
-            for part in output_dir.parts:
-                slug_part = ctx.generate_slug_from_text(part)
-                dir_parts.append(slug_part)
-            output_dir_str = "/".join(dir_parts)
-            path = f"/{output_dir_str}/{base_name}.{format_name}"
-        else:
-            path = f"/{base_name}.{format_name}"
-
-        # Normalize path separators for URLs
-        return path.replace("\\", "/")
-
-    def _rewrite_html_to_picture_elements(
+    def _rewrite_html_to_responsive_images(
         self,
         content: str,
-        responsive_images: dict[str, dict[str, dict[int, str]]],
+        responsive_images: dict[str, dict[int, str]],
         image_dimensions: dict[str, tuple[int, int]],
         ctx: PageContext,
     ) -> str:
-        """Rewrite HTML img tags to use picture elements with responsive images."""
+        """Rewrite HTML img tags to use responsive images."""
 
         def replace_img_tag(match: re.Match) -> str:
             full_tag = match.group(0)
@@ -598,10 +468,9 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
             dimensions = image_dimensions.get(img_src, (1024, 768))
             width, height = dimensions
 
-            if not self.config.use_picture_element:
-                # Simple img tag with srcset
-                return self._create_simple_responsive_img(
-                    img_src,
+            if self.config.use_picture_element:
+                # Full picture element with WebP source
+                return self._create_picture_element(
                     responsive_images[img_src],
                     alt_text,
                     class_attr,
@@ -609,9 +478,8 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
                     height,
                 )
             else:
-                # Full picture element
-                return self._create_picture_element(
-                    img_src,
+                # Simple img tag with srcset
+                return self._create_responsive_img(
                     responsive_images[img_src],
                     alt_text,
                     class_attr,
@@ -625,127 +493,92 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
     def _create_picture_element(
         self,
-        img_src: str,
-        formats_data: dict[str, dict[int, str]],
+        responsive_data: dict[int, str],
         alt_text: str,
         class_attr: str,
         width: int,
         height: int,
     ) -> str:
-        """Create a picture element with source tags for each format."""
-        sources = []
-        fallback_src = ""
+        """Create a picture element with WebP source."""
+        if not responsive_data:
+            return f'<img src="" alt="{alt_text}"{class_attr}>'
 
-        # Create source elements for each format
-        for format_name in self.config.formats:
-            if format_name not in formats_data or not formats_data[format_name]:
-                continue
+        # Build srcset for WebP
+        srcset_parts = []
+        for size, path in sorted(responsive_data.items()):
+            srcset_parts.append(f"{path} {size}w")
 
-            # Build srcset
-            srcset_parts = []
-            for size, path in sorted(formats_data[format_name].items()):
-                srcset_parts.append(f"{path} {size}w")
+        srcset = ", ".join(srcset_parts)
 
-            if srcset_parts:
-                srcset = ", ".join(srcset_parts)
-                mime_type = f"image/{format_name}"
-                source_tag = (
-                    f'  <source type="{mime_type}" '
-                    f'srcset="{srcset}" '
-                    f'sizes="{self.config.default_sizes}">'
-                )
-                sources.append(source_tag)
+        # Use the largest size as fallback
+        sizes = sorted(responsive_data.keys())
+        fallback_size = sizes[-1] if len(sizes) == 1 else sizes[len(sizes) // 2]
+        fallback_src = responsive_data[fallback_size]
 
-                # Use first format as fallback
-                if not fallback_src:
-                    # Use the largest size as fallback, or middle size if available
-                    sizes = sorted(formats_data[format_name].keys())
-                    fallback_size = (
-                        sizes[-1] if len(sizes) == 1 else sizes[len(sizes) // 2]
-                    )
-                    fallback_src = formats_data[format_name][fallback_size]
-
-        # Create fallback img tag
+        # Create picture element
         loading_attr = (
             ' loading="lazy" decoding="async"' if self.config.add_loading_lazy else ""
         )
-        img_attrs = (
-            f'src="{fallback_src}" alt="{alt_text}"{class_attr}{loading_attr} '
-            f'width="{width}" height="{height}"'
-        )
 
-        # Combine into picture element
-        picture_parts = ["<picture>"] + sources + [f"  <img {img_attrs}>", "</picture>"]
-        return "\n".join(picture_parts)
+        picture_html = f"""<picture>
+  <source type="image/webp" srcset="{srcset}" sizes="{self.config.default_sizes}">
+  <img src="{fallback_src}" alt="{alt_text}"{class_attr}{loading_attr}
+       width="{width}" height="{height}">
+</picture>"""
 
-    def _create_simple_responsive_img(
+        return picture_html
+
+    def _create_responsive_img(
         self,
-        img_src: str,
-        formats_data: dict[str, dict[int, str]],
+        responsive_data: dict[int, str],
         alt_text: str,
         class_attr: str,
         width: int,
         height: int,
     ) -> str:
-        """Create a simple img tag with srcset (first format only)."""
-        # Use first available format
-        for format_name in self.config.formats:
-            if format_name in formats_data and formats_data[format_name]:
-                # Build srcset
-                srcset_parts = []
-                fallback_src = ""
+        """Create a simple img tag with srcset."""
+        if not responsive_data:
+            return f'<img src="" alt="{alt_text}"{class_attr}>'
 
-                for size, path in sorted(formats_data[format_name].items()):
-                    srcset_parts.append(f"{path} {size}w")
-                    if not fallback_src:
-                        fallback_src = path
+        # Build srcset
+        srcset_parts = []
+        fallback_src = ""
 
-                srcset = ", ".join(srcset_parts)
-                loading_attr = (
-                    ' loading="lazy" decoding="async"'
-                    if self.config.add_loading_lazy
-                    else ""
-                )
+        for size, path in sorted(responsive_data.items()):
+            srcset_parts.append(f"{path} {size}w")
+            if not fallback_src:
+                fallback_src = path
 
-                return (
-                    f'<img src="{fallback_src}" '
-                    f'srcset="{srcset}" '
-                    f'sizes="{self.config.default_sizes}" '
-                    f'alt="{alt_text}"{class_attr}{loading_attr} '
-                    f'width="{width}" height="{height}">'
-                )
+        srcset = ", ".join(srcset_parts)
+        loading_attr = (
+            ' loading="lazy" decoding="async"' if self.config.add_loading_lazy else ""
+        )
 
-        # Fallback to original if no formats processed
-        return f'<img src="{img_src}" alt="{alt_text}"{class_attr}>'
+        return (
+            f'<img src="{fallback_src}" '
+            f'srcset="{srcset}" '
+            f'sizes="{self.config.default_sizes}" '
+            f'alt="{alt_text}"{class_attr}{loading_attr} '
+            f'width="{width}" height="{height}">'
+        )
 
     def _update_featured_photos(
         self,
         featured_photos: list[str],
-        responsive_images: dict[str, dict[str, dict[int, str]]],
+        responsive_images: dict[str, dict[int, str]],
         ctx: PageContext,
     ) -> list[str]:
         """Update featured_photos to point to converted images (use largest size)."""
         updated_photos = []
         for photo in featured_photos:
             if photo in responsive_images and responsive_images[photo]:
-                # Use first available format and largest size
-                for format_name in self.config.formats:
-                    if (
-                        format_name in responsive_images[photo]
-                        and responsive_images[photo][format_name]
-                    ):
-                        sizes = sorted(responsive_images[photo][format_name].keys())
-                        largest_size = sizes[-1]
-                        new_src = responsive_images[photo][format_name][largest_size]
-                        updated_photos.append(new_src)
-                        if self.config.verbose:
-                            logger.debug(
-                                f"Updated featured photo: {photo} -> {new_src}"
-                            )
-                        break
-                else:
-                    # Keep original if not processed
-                    updated_photos.append(photo)
+                # Use largest size
+                sizes = sorted(responsive_images[photo].keys())
+                largest_size = sizes[-1]
+                new_src = responsive_images[photo][largest_size]
+                updated_photos.append(new_src)
+                if self.config.verbose:
+                    logger.debug(f"Updated featured photo: {photo} -> {new_src}")
             else:
                 # Keep original if not processed
                 updated_photos.append(photo)

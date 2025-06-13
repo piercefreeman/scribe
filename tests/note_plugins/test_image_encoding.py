@@ -27,9 +27,8 @@ class TestImageEncodingPlugin:
         return ImageEncodingPluginConfig(
             name="image_encoding",
             cache_dir=str(temp_dir / "cache"),
-            formats=["webp", "avif"],
+            formats=["webp"],
             quality_webp=80,
-            quality_avif=65,
             max_width=1920,
             max_height=1080,
             generate_responsive=True,
@@ -111,7 +110,6 @@ class TestImageEncodingPlugin:
         assert plugin.config == sample_config
         assert plugin.name == "image_encoding"
         assert hasattr(plugin, "supports_webp")
-        assert hasattr(plugin, "supports_avif")
 
     async def test_extract_image_references(
         self, plugin: ImageEncodingPlugin, page_context: PageContext
@@ -144,9 +142,6 @@ class TestImageEncodingPlugin:
         assert len(formats) > 0  # At least one format should be supported
         if plugin.supports_webp:
             assert "webp" in formats
-        # Only assert AVIF if it's actually in formats (may not be fully supported)
-        # if plugin.supports_avif:
-        #     assert "avif" in formats
 
         # Check responsive images data
         responsive_images = result_ctx.image_encoding_data.responsive_images
@@ -325,10 +320,6 @@ class TestImageEncodingPlugin:
             # At least some responsive image should be generated
             assert "testimage-" in new_content  # At least one responsive size generated
             assert ".webp" in new_content  # WebP format
-        elif plugin.supports_avif:
-            # At least some responsive image should be generated
-            assert "testimage-" in new_content  # At least one responsive size generated
-            assert ".avif" in new_content  # AVIF format
 
         # Should have loading attributes
         assert 'loading="lazy"' in new_content
@@ -413,10 +404,9 @@ class TestImageEncodingPlugin:
         converted_photo1 = result.featured_photos[0]
         converted_photo2 = result.featured_photos[1]
 
-        # Should have .webp or .avif extension
-        # (depending on which format is first in config)
-        assert converted_photo1.endswith((".webp", ".avif"))
-        assert converted_photo2.endswith((".webp", ".avif"))
+        # Should have .webp extension
+        assert converted_photo1.endswith(".webp")
+        assert converted_photo2.endswith(".webp")
 
         # Should start with / for absolute path
         assert converted_photo1.startswith("/")
@@ -482,9 +472,7 @@ class TestImageEncodingPlugin:
 
         # Should update featured_photos
         assert len(result.featured_photos) == 2
-        assert all(
-            photo.endswith((".webp", ".avif")) for photo in result.featured_photos
-        )
+        assert all(photo.endswith(".webp") for photo in result.featured_photos)
 
         # Should update content with picture elements
         assert "<picture>" in result.content

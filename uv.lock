@@ -681,6 +681,32 @@ dependencies = [
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4c/a2/d8ecd2f7ffa084870ba071a584aac44800a89f3c77b305999be7dc8b7bb3/pyvips-3.0.0.tar.gz", hash = "sha256:79459975e4a16089b0eaafed26eb1400ae66ebc16d3ff3a7d2241abcf19dc9e8", size = 56806 }
 
+[package.optional-dependencies]
+binary = [
+    { name = "pyvips-binary" },
+]
+
+[[package]]
+name = "pyvips-binary"
+version = "8.17.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/05/e4/075bf4f33d47c57023bf8ac0f2ca68c1618adf8280cbb3190202c7340dbc/pyvips_binary-8.17.0.tar.gz", hash = "sha256:3df8196ecebb69e57a08da921833b3088ab2d8c3f8678073284cc44676baa820", size = 3776 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/ad/0445c618d084c110c51b4e468e6fb3eb440a4763ca90ed5833661b2cda17/pyvips_binary-8.17.0-cp37-abi3-macosx_10_15_x86_64.whl", hash = "sha256:d6f460dc2251f02dcf12ca04143cfee1c3e76004742a3fbc7dabc57b8287e410", size = 8147285 },
+    { url = "https://files.pythonhosted.org/packages/ad/ed/d9af227226f39c661cb6bf60583f06abb4c4463628db241ad0e4a583f2df/pyvips_binary-8.17.0-cp37-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:1ae6f94c28ab0eb72a26dfe694853bc2873f4cee0631cd9ae6e54c81c31300b4", size = 7393672 },
+    { url = "https://files.pythonhosted.org/packages/ea/2f/37fb09f70d6a9be0cefab0da5a4524b815554b4046297de8df7e54bbae76/pyvips_binary-8.17.0-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:10342f0dbe35a16287aa2e7e2099db58bf578bf504d90d1ff6c0f3be84c65847", size = 7318475 },
+    { url = "https://files.pythonhosted.org/packages/d7/1a/a118d3bbf37898b9a8757f4cd2529696b0ac7d2d69bfb4e496b12a0b99c7/pyvips_binary-8.17.0-cp37-abi3-manylinux_2_31_armv7l.whl", hash = "sha256:6949ba419896f395b0a6badf48958fa554f9e6f42c9cdcc98329121ba2c8c951", size = 7178745 },
+    { url = "https://files.pythonhosted.org/packages/d4/3d/b2ef235c006b87fc43408118af7c90346129c816cbd11a19c05046843934/pyvips_binary-8.17.0-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:c40e1b102a439381e988b96cfdeecc1a7c78b4f74d8811d5ad0b5f342242f0dd", size = 7563779 },
+    { url = "https://files.pythonhosted.org/packages/aa/28/5ebcf4a8d0a16d14e44c4d493ff2bb134474bf15d407a7cf409a0730f2ae/pyvips_binary-8.17.0-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:39e7af686f1b04219a3e7589088f60750f4309fd3c670b26ea3ebc77e1e439a4", size = 7443393 },
+    { url = "https://files.pythonhosted.org/packages/c3/0b/2a723430ff5151184f48d28465f8113f7a924d4ffaac0a067b2b53da59e9/pyvips_binary-8.17.0-cp37-abi3-win32.whl", hash = "sha256:06ebdbff8b867a95887fd510eb4bd038a53ac94b1cd307d04f767bf9aeb231b3", size = 7977801 },
+    { url = "https://files.pythonhosted.org/packages/a9/2d/45f15181209f0b6bc8bbf65d3b6839f66ac2fe97a46c7d48096d987a8343/pyvips_binary-8.17.0-cp37-abi3-win_amd64.whl", hash = "sha256:1e9774427fe5d90a0ca8e0eb5fcf52de9bf48a07a2e18c990ef05cd578cd5f67", size = 7972728 },
+    { url = "https://files.pythonhosted.org/packages/55/c6/59266ef342dd5d7837329c42a6c0058b97ef85ab3396526257cf92b80fdb/pyvips_binary-8.17.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:8bd1da2799bda2c28857abe46e4bc0a474b2646ba4bfe3314099a80554c6c93c", size = 7221168 },
+    { url = "https://files.pythonhosted.org/packages/fb/8c/d3b486719237ec3695eec91953676935985f6f55a1b40deef50d2b02437d/pyvips_binary-8.17.0-cp39-abi3-win_arm64.whl", hash = "sha256:0c6e9d42b388335aab238ff15cb6e3b0946b9b90967c83b5250445662222f84d", size = 6990909 },
+]
+
 [[package]]
 name = "pyyaml"
 version = "6.0.2"
@@ -777,7 +803,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-frontmatter" },
-    { name = "pyvips" },
+    { name = "pyvips", extra = ["binary"] },
     { name = "pyyaml" },
     { name = "rich" },
     { name = "uvicorn" },
@@ -816,7 +842,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "python-frontmatter", specifier = ">=1.0.0" },
-    { name = "pyvips", specifier = ">=3.0.0" },
+    { name = "pyvips", extras = ["binary"], specifier = ">=3.0.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
