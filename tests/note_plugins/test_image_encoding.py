@@ -579,14 +579,18 @@ class TestImageEncodingPlugin:
 
         generated_sizes = list(responsive_images["test_photo.png"].keys())
         print(f"Generated sizes: {sorted(generated_sizes)}")
-        
+
         # Should have generated multiple sizes (all that fit within 1800px width)
         expected_sizes = [400, 600, 800, 1200]  # All should fit in 1800px
-        assert len(generated_sizes) >= 3, f"Expected at least 3 sizes, got {len(generated_sizes)}: {generated_sizes}"
-        
+        assert len(generated_sizes) >= 3, (
+            f"Expected at least 3 sizes, got {len(generated_sizes)}: {generated_sizes}"
+        )
+
         # Verify specific sizes are present
         for expected_size in [400, 600, 800]:
-            assert expected_size in generated_sizes, f"Missing {expected_size}px size in {generated_sizes}"
+            assert expected_size in generated_sizes, (
+                f"Missing {expected_size}px size in {generated_sizes}"
+            )
 
         # Check that srcset contains multiple sizes
         srcset_content = result.content
@@ -597,23 +601,27 @@ class TestImageEncodingPlugin:
         # Verify files were actually written to output directory
         output_images_dir = temp_dir / "output" / "images"
         assert output_images_dir.exists(), "Output images directory not created"
-        
+
         output_files = list(output_images_dir.glob("*.webp"))
         print(f"Output files: {[f.name for f in output_files]}")
-        
+
         # Should have multiple WebP files
-        assert len(output_files) >= 3, f"Expected at least 3 output files, got {len(output_files)}"
-        
+        assert len(output_files) >= 3, (
+            f"Expected at least 3 output files, got {len(output_files)}"
+        )
+
         # Check specific files exist
         expected_files = [
             "responsive-test_testphoto_400.webp",
-            "responsive-test_testphoto_600.webp", 
+            "responsive-test_testphoto_600.webp",
             "responsive-test_testphoto_800.webp",
         ]
-        
+
         for expected_file in expected_files:
             expected_path = output_images_dir / expected_file
             assert expected_path.exists(), f"Missing output file: {expected_file}"
-            
+
             # Verify file has content
-            assert expected_path.stat().st_size > 0, f"Empty output file: {expected_file}"
+            assert expected_path.stat().st_size > 0, (
+                f"Empty output file: {expected_file}"
+            )

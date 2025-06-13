@@ -250,11 +250,22 @@ class SiteBuilder:
             return None
 
     async def _process_files_with_progress(
-        self, tasks: list
+        self, tasks: list, max_concurrent: int = 10
     ) -> list[PageContext | None]:
-        """Process files concurrently with a progress bar."""
+        """Process files concurrently with a progress bar, limited by semaphore."""
         if not tasks:
             return []
+
+        # Create semaphore to limit concurrent operations
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def _process_with_semaphore(coro):
+            """Wrapper to run coroutine with semaphore."""
+            async with semaphore:
+                return await coro
+
+        # Wrap all tasks with semaphore
+        semaphored_tasks = [_process_with_semaphore(task) for task in tasks]
 
         with Progress(
             SpinnerColumn(),
@@ -266,11 +277,12 @@ class SiteBuilder:
             transient=False,
         ) as progress:
             task_id = progress.add_task(
-                f"Processing {len(tasks)} files...", total=len(tasks)
+                f"Processing {len(tasks)} files ({max_concurrent} concurrent)...",
+                total=len(tasks),
             )
 
             results = []
-            for coro in asyncio.as_completed(tasks):
+            for coro in asyncio.as_completed(semaphored_tasks):
                 result = await coro
                 results.append(result)
                 progress.advance(task_id)

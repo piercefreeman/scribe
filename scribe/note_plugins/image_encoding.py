@@ -207,7 +207,9 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
                 return False
 
             # For each size, load the image fresh to avoid memory issues
-            fresh_img = pyvips.Image.new_from_file(str(source_path), access="sequential")
+            fresh_img = pyvips.Image.new_from_file(
+                str(source_path), access="sequential"
+            )
             fresh_img = self._prepare_image(fresh_img)
 
             # Resize image maintaining aspect ratio or use original
@@ -232,10 +234,12 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
             # Use the most conservative approach: ensure image is fully computed
             # Force the image to be fully realized in memory
             processed_img = processed_img.copy()
-            
+
             # Save as WebP using the most basic approach
-            processed_img.webpsave(str(output_file), Q=self.config.quality_webp, lossless=False)
-            
+            processed_img.webpsave(
+                str(output_file), Q=self.config.quality_webp, lossless=False
+            )
+
             return True
 
         except Exception as e:
