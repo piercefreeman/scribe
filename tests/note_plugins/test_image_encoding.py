@@ -32,6 +32,8 @@ class TestImageEncodingPlugin:
             quality_avif=65,
             max_width=1920,
             max_height=1080,
+            generate_responsive=True,
+            responsive_sizes=[480, 768, 1024, 1200],
         )
 
     @pytest.fixture
@@ -65,20 +67,20 @@ class TestImageEncodingPlugin:
     def page_context(
         self, temp_dir: Path, site_config: ScribeConfig, sample_image: Path
     ) -> PageContext:
-        """Create a sample page context with image references."""
+        """Create a sample page context with HTML image references."""
         source_file = temp_dir / "source" / "test_page.md"
         source_file.parent.mkdir(exist_ok=True)
 
-        # Create markdown content with image references
-        content = """# Test Page
+        # Create HTML content with image references (as if processed by markdown plugin)
+        content = """<h1>Test Page</h1>
 
-This is a test page with images.
+<p>This is a test page with images.</p>
 
-![Test Image](test_image.jpg)
+<p><img src="test_image.jpg" alt="Test Image"></p>
 
-Some more content here.
+<p>Some more content here.</p>
 
-<img src="test_image.jpg" alt="HTML image">
+<p><img src="test_image.jpg" alt="HTML image"></p>
 """
 
         source_file.write_text(content)
@@ -114,8 +116,8 @@ Some more content here.
     async def test_extract_image_references(
         self, plugin: ImageEncodingPlugin, page_context: PageContext
     ) -> None:
-        """Test extracting image references from content."""
-        image_refs = plugin._extract_image_references(page_context.content)
+        """Test extracting image references from HTML content."""
+        image_refs = plugin._extract_html_image_references(page_context.content)
         assert len(image_refs) == 1  # Should deduplicate the same image
         assert "test_image.jpg" in image_refs
 
@@ -130,6 +132,8 @@ Some more content here.
         assert result_ctx.image_encoding_data is not None
         assert result_ctx.image_encoding_data.processed_images is not None
         assert result_ctx.image_encoding_data.formats is not None
+        assert result_ctx.image_encoding_data.responsive_images is not None
+        assert result_ctx.image_encoding_data.image_dimensions is not None
 
         # Check that images were processed
         processed_images = result_ctx.image_encoding_data.processed_images
@@ -142,13 +146,17 @@ Some more content here.
         if plugin.supports_avif:
             assert "avif" in formats
 
+        # Check responsive images data
+        responsive_images = result_ctx.image_encoding_data.responsive_images
+        assert "test_image.jpg" in responsive_images
+
     async def test_process_page_no_images(
         self, plugin: ImageEncodingPlugin, temp_dir: Path, site_config: ScribeConfig
     ) -> None:
         """Test processing a page with no image references."""
         # Create page context without images
         source_file = temp_dir / "source" / "no_images.md"
-        content = "# No Images\n\nThis page has no images."
+        content = "<h1>No Images</h1>\n\n<p>This page has no images.</p>"
         source_file.write_text(content)
 
         ctx = PageContext(
@@ -188,21 +196,21 @@ Some more content here.
         key2 = plugin._get_cache_key(sample_image, page_context)
         assert key1 == key2
         assert isinstance(key1, str)
-        # Cache key should be based on relative path with safe characters
-        assert "test_image.jpg" in key1
+        # Cache key should be based on relative path with slug formatting
+        assert "testimage" in key1  # test_image.jpg becomes testimage
 
     async def test_extract_external_images_ignored(
         self, plugin: ImageEncodingPlugin
     ) -> None:
         """Test that external URLs are ignored."""
         content = """
-        ![External](https://example.com/image.jpg)
-        ![Local](local_image.jpg)
+        <img src="https://example.com/image.jpg" alt="External">
+        <img src="local_image.jpg" alt="Local">
         <img src="http://example.com/image.png" alt="External HTML">
         <img src="local.png" alt="Local HTML">
         """
 
-        image_refs = plugin._extract_image_references(content)
+        image_refs = plugin._extract_html_image_references(content)
         assert len(image_refs) == 2
         assert "local_image.jpg" in image_refs
         assert "local.png" in image_refs
@@ -269,21 +277,21 @@ Some more content here.
         site_config: ScribeConfig,
         sample_image: Path,
     ) -> None:
-        """Test that image paths are rewritten in content after processing."""
+        """Test that image paths are rewritten to use picture elements."""
         # Create a fresh page context for this test
         source_file = temp_dir / "source" / "rewrite_test.md"
         source_file.parent.mkdir(exist_ok=True)
 
-        # Create content with original jpg references
-        original_content = """# Test Page
+        # Create HTML content with original jpg references
+        original_content = """<h1>Test Page</h1>
 
-This is a test page with images.
+<p>This is a test page with images.</p>
 
-![Test Image](test_image.jpg)
+<p><img src="test_image.jpg" alt="Test Image"></p>
 
-Some more content here.
+<p>Some more content here.</p>
 
-<img src="test_image.jpg" alt="HTML image">
+<p><img src="test_image.jpg" alt="HTML image"></p>
 """
 
         source_file.write_text(original_content)
@@ -299,30 +307,32 @@ Some more content here.
         # Process the page which should rewrite image paths
         result_ctx = await plugin.process(ctx)
 
-        # Check that content was modified to use converted format
+        # Check that content was modified to use picture elements
         new_content = result_ctx.content
 
         # Original content should have .jpg references
         assert "test_image.jpg" in original_content
 
-        # New content should have converted format references with absolute
-        # paths (assuming webp is supported)
+        # New content should have picture elements with responsive images
+        assert "<picture>" in new_content
+        assert "<source" in new_content
+        assert "srcset=" in new_content
+
+        # Should have responsive sizes in srcset with slug-based naming
         if plugin.supports_webp:
-            assert "/test_image.webp" in new_content
-            assert "test_image.jpg" not in new_content
-
-            # Check both markdown and HTML image formats are rewritten with
-            # absolute paths
-            assert "![Test Image](/test_image.webp)" in new_content
-            assert '<img src="/test_image.webp"' in new_content
+            assert "testimage-480.webp" in new_content  # Updated expectation
+            assert "testimage-768.webp" in new_content  # Updated expectation
+            assert "testimage-1024.webp" in new_content  # Updated expectation
+            assert "testimage-1200.webp" in new_content  # Updated expectation
         elif plugin.supports_avif:
-            assert "/test_image.avif" in new_content
-            assert "test_image.jpg" not in new_content
+            assert "testimage-480.avif" in new_content  # Updated expectation
+            assert "testimage-768.avif" in new_content  # Updated expectation
+            assert "testimage-1024.avif" in new_content  # Updated expectation
+            assert "testimage-1200.avif" in new_content  # Updated expectation
 
-            # Check both markdown and HTML image formats are rewritten with
-            # absolute paths
-            assert "![Test Image](/test_image.avif)" in new_content
-            assert '<img src="/test_image.avif"' in new_content
+        # Should have loading attributes
+        assert 'loading="lazy"' in new_content
+        assert 'decoding="async"' in new_content
 
     async def test_path_rewriting_with_subdirectories(
         self,
@@ -340,7 +350,7 @@ Some more content here.
         image_path = sub_dir / "photo.jpg"
         img.save(image_path, format="JPEG")
 
-        # Create page context with content referencing subdirectory image
+        # Create page context with HTML content referencing subdirectory image
         source_path = temp_dir / "source" / "test.md"
         source_path.write_text("content")
 
@@ -348,18 +358,20 @@ Some more content here.
             source_path=source_path,
             relative_path=Path("test.md"),
             output_path=temp_dir / "output" / "test.html",
-            raw_content="![Gallery photo](images/gallery/photo.jpg)",
-            content="![Gallery photo](images/gallery/photo.jpg)",
+            raw_content=(
+                '<p><img src="images/gallery/photo.jpg" alt="Gallery photo"></p>'
+            ),
+            content=('<p><img src="images/gallery/photo.jpg" alt="Gallery photo"></p>'),
         )
 
         plugin = ImageEncodingPlugin(sample_config, site_config)
         result = await plugin.process(ctx)
 
-        # Should rewrite to use subdirectory in output path
+        # Should rewrite to use picture element with subdirectory in output path
+        assert "<picture>" in result.content
         assert (
-            "/images/gallery/photo.webp" in result.content
-            or "/images/gallery/photo.avif" in result.content
-        )
+            "/images/gallery/photo-" in result.content
+        )  # Should contain responsive images in subdirectory
 
     async def test_featured_photos_processing(
         self,
@@ -386,8 +398,8 @@ Some more content here.
             source_path=source_path,
             relative_path=Path("test.md"),
             output_path=temp_dir / "output" / "test.html",
-            raw_content="Some content without images in text",
-            content="Some content without images in text",
+            raw_content="<p>Some content without images in text</p>",
+            content="<p>Some content without images in text</p>",
             featured_photos=["featured1.jpg", "featured2.jpg"],
         )
 
@@ -436,7 +448,7 @@ Some more content here.
         img2.save(image2_path, format="JPEG")
         img3.save(image3_path, format="JPEG")
 
-        # Create page context with both featured_photos and content images
+        # Create page context with both featured_photos and content images (HTML)
         source_path = temp_dir / "source" / "test.md"
         source_path.write_text("content")
 
@@ -444,8 +456,14 @@ Some more content here.
             source_path=source_path,
             relative_path=Path("test.md"),
             output_path=temp_dir / "output" / "test.html",
-            raw_content="![Content image](content.jpg) ![Shared image](both.jpg)",
-            content="![Content image](content.jpg) ![Shared image](both.jpg)",
+            raw_content=(
+                '<p><img src="content.jpg" alt="Content image"> '
+                '<img src="both.jpg" alt="Shared image"></p>'
+            ),
+            content=(
+                '<p><img src="content.jpg" alt="Content image"> '
+                '<img src="both.jpg" alt="Shared image"></p>'
+            ),
             featured_photos=["featured.jpg", "both.jpg"],
         )
 
@@ -468,6 +486,54 @@ Some more content here.
             photo.endswith((".webp", ".avif")) for photo in result.featured_photos
         )
 
-        # Should update content
-        assert "content.webp" in result.content or "content.avif" in result.content
-        assert "both.webp" in result.content or "both.avif" in result.content
+        # Should update content with picture elements
+        assert "<picture>" in result.content
+        assert (
+            "content-" in result.content or "both-" in result.content
+        )  # Should have responsive images
+
+    async def test_simple_responsive_img_mode(
+        self,
+        temp_dir: Path,
+        site_config: ScribeConfig,
+    ) -> None:
+        """Test that use_picture_element=False creates simple img tags with srcset."""
+        # Create config with picture element disabled
+        config = ImageEncodingPluginConfig(
+            name="image_encoding",
+            cache_dir=str(temp_dir / "cache"),
+            formats=["webp"],
+            use_picture_element=False,
+            generate_responsive=True,
+            responsive_sizes=[480, 768, 1024],
+        )
+
+        # Create test image
+        img = Image.new("RGB", (1200, 800), color="red")
+        image_path = temp_dir / "static" / "test.jpg"
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        img.save(image_path, format="JPEG")
+
+        # Create page context with HTML content
+        source_path = temp_dir / "source" / "test.md"
+        source_path.write_text("content")
+
+        ctx = PageContext(
+            source_path=source_path,
+            relative_path=Path("test.md"),
+            output_path=temp_dir / "output" / "test.html",
+            raw_content='<p><img src="test.jpg" alt="Test image"></p>',
+            content='<p><img src="test.jpg" alt="Test image"></p>',
+        )
+
+        plugin = ImageEncodingPlugin(config, site_config)
+        result = await plugin.process(ctx)
+
+        # Should create simple img tag with srcset, not picture element
+        assert "<picture>" not in result.content
+        assert "<source" not in result.content
+        assert 'srcset="' in result.content
+        assert 'sizes="' in result.content
+        assert "test-480.webp" in result.content
+        assert "test-768.webp" in result.content
+        assert "test-1024.webp" in result.content

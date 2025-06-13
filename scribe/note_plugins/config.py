@@ -178,12 +178,15 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
         - 768
         - 1024
         - 1200
+      default_sizes: "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+      use_picture_element: true
+      add_loading_lazy: true
       verbose: false
     ```
     """
 
     name: Literal[PluginName.IMAGE_ENCODING] = PluginName.IMAGE_ENCODING
-    before_dependencies: list[PluginName] = [PluginName.MARKDOWN]
+    after_dependencies: list[PluginName] = [PluginName.MARKDOWN]
 
     cache_dir: Path = Field(
         default=Path(".image_cache"), description="Directory to cache processed images"
@@ -210,6 +213,16 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
     responsive_sizes: list[int] = Field(
         default_factory=lambda: [480, 768, 1024, 1200],
         description="Responsive image widths to generate",
+    )
+    default_sizes: str = Field(
+        default="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw",
+        description="Default sizes attribute for responsive images",
+    )
+    use_picture_element: bool = Field(
+        default=True, description="Use <picture> element for enhanced browser support"
+    )
+    add_loading_lazy: bool = Field(
+        default=True, description="Add loading='lazy' to img elements"
     )
     verbose: bool = Field(default=False, description="Enable verbose logging")
 
