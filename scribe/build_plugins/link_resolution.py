@@ -79,6 +79,8 @@ class LinkResolver:
         if not link.should_resolve():
             return link.url
 
+        original_url = link.url.strip()
+        was_md_link = original_url.endswith(".md")
         cleaned_url = self._clean_url(link.url)
 
         # Try different resolution strategies in order
@@ -91,6 +93,11 @@ class LinkResolver:
             resolved_url = strategy(cleaned_url, ctx)
             if resolved_url:
                 return resolved_url
+
+        # If original link was a .md file but we couldn't resolve it,
+        # check if file exists
+        if was_md_link:
+            self._check_md_file_exists(original_url, ctx)
 
         # No resolution found - return original or with .md extension
         return cleaned_url + (".md" if not link.is_external() else "")
@@ -131,6 +138,38 @@ class LinkResolver:
         except Exception as e:
             logger.debug(f"Error resolving relative path {url}: {e}")
             return None
+
+    def _check_md_file_exists(self, original_url: str, ctx: PageContext) -> None:
+        """Check if a .md file exists on disk and raise exception if not."""
+        try:
+            # Handle different types of paths
+            if original_url.startswith("./") or original_url.startswith("../"):
+                # Relative path
+                current_dir = ctx.source_path.parent
+                target_path = current_dir / original_url
+                resolved_path = target_path.resolve()
+            else:
+                # Assume it's relative to the current file's directory
+                current_dir = ctx.source_path.parent
+                target_path = current_dir / original_url
+                resolved_path = target_path.resolve()
+
+            if not resolved_path.exists():
+                raise FileNotFoundError(
+                    f"Markdown file not found: '{original_url}' "
+                    f"referenced in '{ctx.source_path}'. "
+                    f"Resolved path: '{resolved_path}'"
+                )
+
+        except Exception as e:
+            if isinstance(e, FileNotFoundError):
+                raise
+            # For other exceptions, still raise a meaningful error
+            raise FileNotFoundError(
+                f"Error checking markdown file: '{original_url}' "
+                f"referenced in '{ctx.source_path}'. "
+                f"Error: {e}"
+            ) from e
 
 
 class HtmlLinkProcessor:

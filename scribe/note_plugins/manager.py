@@ -13,7 +13,6 @@ from scribe.note_plugins.date import DatePlugin
 from scribe.note_plugins.footnotes import FootnotesPlugin
 from scribe.note_plugins.frontmatter import FrontmatterPlugin
 from scribe.note_plugins.image_encoding import ImageEncodingPlugin
-from scribe.note_plugins.link_resolution import LinkResolutionPlugin
 from scribe.note_plugins.markdown import MarkdownPlugin
 from scribe.note_plugins.screenshot import ScreenshotPlugin
 from scribe.note_plugins.snapshot import SnapshotPlugin
@@ -36,7 +35,6 @@ class PluginManager(BasePluginManager[PluginConfig, NotePlugin]):
         self._plugin_registry: dict[PluginName, type[NotePlugin]] = {
             PluginName.FRONTMATTER: FrontmatterPlugin,
             PluginName.FOOTNOTES: FootnotesPlugin,
-            PluginName.LINK_RESOLUTION: LinkResolutionPlugin,
             PluginName.MARKDOWN: MarkdownPlugin,
             PluginName.DATE: DatePlugin,
             PluginName.SCREENSHOT: ScreenshotPlugin,
