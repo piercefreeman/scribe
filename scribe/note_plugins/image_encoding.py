@@ -206,27 +206,36 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
             if target_width > img.width:
                 return False
 
+            # For each size, load the image fresh to avoid memory issues
+            fresh_img = pyvips.Image.new_from_file(str(source_path), access="sequential")
+            fresh_img = self._prepare_image(fresh_img)
+
             # Resize image maintaining aspect ratio or use original
-            if target_width == img.width:
-                processed_img = img
+            if target_width == fresh_img.width:
+                processed_img = fresh_img
             else:
-                scale = target_width / img.width
-                processed_img = img.resize(scale)
+                scale = target_width / fresh_img.width
+                processed_img = fresh_img.resize(scale)
 
             # Apply max_height constraint if specified
             if self.config.max_height and processed_img.height > self.config.max_height:
                 scale = self.config.max_height / processed_img.height
                 processed_img = processed_img.resize(scale)
 
-            # Save to cache using slug-based naming
+            # Save to cache using consistent naming that matches parsing logic
             base_name = ctx.generate_slug_from_text(source_path.stem)
             output_file = cache_dir / f"{base_name}-{target_width}.webp"
 
             if self.config.verbose:
                 logger.debug(f"Saving WebP file: {output_file}")
 
-            # Save as WebP
-            processed_img.write_to_file(str(output_file), Q=self.config.quality_webp)
+            # Use the most conservative approach: ensure image is fully computed
+            # Force the image to be fully realized in memory
+            processed_img = processed_img.copy()
+            
+            # Save as WebP using the most basic approach
+            processed_img.webpsave(str(output_file), Q=self.config.quality_webp, lossless=False)
+            
             return True
 
         except Exception as e:
@@ -240,20 +249,9 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
         responsive_data = {}
         original_dimensions = (1024, 768)  # fallback
 
-        # Get directory structure for URL generation
-        try:
-            if self.global_config.static_path:
-                output_relative_path = source_path.relative_to(
-                    self.global_config.static_path
-                )
-            else:
-                output_relative_path = source_path.relative_to(
-                    self.global_config.source_dir
-                )
-        except ValueError:
-            output_relative_path = Path(source_path.name)
-
-        output_dir = output_relative_path.parent
+        # Get naming components for new convention
+        image_name = ctx.generate_slug_from_text(source_path.stem)
+        page_slug = ctx.slug or "untitled"
 
         # Find all cached WebP files
         for cached_file in cache_dir.glob("*.webp"):
@@ -262,29 +260,15 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
             if "-" in name_part:
                 try:
                     width = int(name_part.split("-")[-1])
-                    # Generate proper URL path with slug-based directory names
-                    if output_dir != Path(".") and str(output_dir) != ".":
-                        dir_parts = []
-                        for part in output_dir.parts:
-                            slug_part = ctx.generate_slug_from_text(part)
-                            dir_parts.append(slug_part)
-                        output_dir_str = "/".join(dir_parts)
-                        path = f"/{output_dir_str}/{cached_file.name}"
-                    else:
-                        path = f"/{cached_file.name}"
-                    responsive_data[width] = path.replace("\\", "/")
+                    # Generate URL using new naming convention
+                    filename = f"{page_slug}_{image_name}_{width}.webp"
+                    path = f"/images/{filename}"
+                    responsive_data[width] = path
                 except ValueError:
                     # Fallback for non-responsive files
-                    if output_dir != Path(".") and str(output_dir) != ".":
-                        dir_parts = []
-                        for part in output_dir.parts:
-                            slug_part = ctx.generate_slug_from_text(part)
-                            dir_parts.append(slug_part)
-                        output_dir_str = "/".join(dir_parts)
-                        path = f"/{output_dir_str}/{cached_file.name}"
-                    else:
-                        path = f"/{cached_file.name}"
-                    responsive_data[1024] = path.replace("\\", "/")
+                    filename = f"{page_slug}_{image_name}.webp"
+                    path = f"/images/{filename}"
+                    responsive_data[1024] = path
 
         return responsive_data, original_dimensions
 
@@ -351,15 +335,7 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
 
     def _prepare_image(self, img: pyvips.Image) -> pyvips.Image:
         """Prepare image for processing."""
-        # Ensure we have at least 3 bands (RGB)
-        if img.bands == 1:
-            # Convert grayscale to RGB
-            img = img.colourspace("srgb")
-        elif img.bands == 4:
-            # Convert RGBA to RGB by flattening with white background
-            img = img.flatten(background=[255, 255, 255])
-
-        # Apply auto-rotation based on EXIF orientation
+        # Apply auto-rotation based on EXIF orientation first
         try:
             # Get the orientation from EXIF data
             orientation = img.get("orientation")
@@ -368,6 +344,24 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
         except pyvips.Error:
             # No orientation data, which is fine
             pass
+
+        # Ensure we have the right number of bands and format
+        if img.bands == 1:
+            # Convert grayscale to RGB
+            img = img.colourspace("srgb")
+        elif img.bands == 4:
+            # Convert RGBA to RGB by flattening with white background
+            img = img.flatten(background=[255, 255, 255])
+        elif img.bands > 4:
+            # Take only the first 3 bands if there are more than 4
+            img = img[:3]
+
+        # Ensure we have exactly 3 bands (RGB)
+        if img.bands != 3:
+            img = img.colourspace("srgb")
+
+        # Convert to sequential access for better memory efficiency with large images
+        img = img.copy()
 
         return img
 
@@ -379,15 +373,30 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
             return
 
         try:
-            # Determine output directory
-            relative_path = self._get_output_path(source_path, ctx)
-            output_dir = self.global_config.output_dir / relative_path.parent
+            # Output to /images/ directory with new naming convention
+            output_dir = self.global_config.output_dir / "images"
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Copy all files from cache to output
+            # Get naming components
+            image_name = ctx.generate_slug_from_text(source_path.stem)
+            page_slug = ctx.slug or "untitled"
+
+            # Copy all files from cache to output with new naming
             for cached_file in cache_dir.glob("*"):
                 if cached_file.is_file():
-                    output_file = output_dir / cached_file.name
+                    # Extract width from cached filename (e.g., "image-480.webp" -> 480)
+                    name_part = cached_file.stem
+                    if "-" in name_part:
+                        try:
+                            width = int(name_part.split("-")[-1])
+                            new_filename = f"{page_slug}_{image_name}_{width}.webp"
+                        except ValueError:
+                            # Fallback for non-responsive files
+                            new_filename = f"{page_slug}_{image_name}.webp"
+                    else:
+                        new_filename = f"{page_slug}_{image_name}.webp"
+
+                    output_file = output_dir / new_filename
                     if self.config.verbose:
                         logger.debug(
                             f"Copying cache file: {cached_file.name} -> {output_file}"
@@ -420,25 +429,14 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
     ) -> str:
         """Get the responsive image path for a given source image and width."""
         # Get the base name without extension and convert to proper slug
-        base_name = ctx.generate_slug_from_text(source_path.stem)
+        image_name = ctx.generate_slug_from_text(source_path.stem)
+        page_slug = ctx.slug or "untitled"
 
-        # Find the source path to determine output location
-        output_relative_path = self._get_output_path(source_path, ctx)
-        output_dir = output_relative_path.parent
+        # New naming convention: /images/{slug}_{image_name}_{resizing}.webp
+        filename = f"{page_slug}_{image_name}_{width}.webp"
+        path = f"/images/{filename}"
 
-        # Convert directory path components to proper slugs
-        if output_dir != Path(".") and str(output_dir) != ".":
-            dir_parts = []
-            for part in output_dir.parts:
-                slug_part = ctx.generate_slug_from_text(part)
-                dir_parts.append(slug_part)
-            output_dir_str = "/".join(dir_parts)
-            path = f"/{output_dir_str}/{base_name}-{width}.webp"
-        else:
-            path = f"/{base_name}-{width}.webp"
-
-        # Normalize path separators for URLs
-        return path.replace("\\", "/")
+        return path
 
     def _rewrite_html_to_responsive_images(
         self,

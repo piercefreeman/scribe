@@ -32,7 +32,7 @@ class TestImageEncodingPlugin:
             max_width=1920,
             max_height=1080,
             generate_responsive=True,
-            responsive_sizes=[480, 768, 1024, 1200],
+            responsive_sizes=[400, 800, 1200],
         )
 
     @pytest.fixture
@@ -318,7 +318,9 @@ class TestImageEncodingPlugin:
         # Should have responsive sizes in srcset with slug-based naming
         if plugin.supports_webp:
             # At least some responsive image should be generated
-            assert "testimage-" in new_content  # At least one responsive size generated
+            assert (
+                "rewritetest_testimage_" in new_content
+            )  # At least one responsive size generated
             assert ".webp" in new_content  # WebP format
 
         # Should have loading attributes
@@ -358,11 +360,11 @@ class TestImageEncodingPlugin:
         plugin = ImageEncodingPlugin(sample_config, site_config)
         result = await plugin.process(ctx)
 
-        # Should rewrite to use picture element with subdirectory in output path
+        # Should rewrite to use picture element with new flat structure
         assert "<picture>" in result.content
         assert (
-            "/images/gallery/photo-" in result.content
-        )  # Should contain responsive images in subdirectory
+            "/images/test_photo_" in result.content
+        )  # Should contain responsive images with new naming convention
 
     async def test_featured_photos_processing(
         self,
@@ -477,8 +479,8 @@ class TestImageEncodingPlugin:
         # Should update content with picture elements
         assert "<picture>" in result.content
         assert (
-            "content-" in result.content or "both-" in result.content
-        )  # Should have responsive images
+            "test_content_" in result.content or "test_both_" in result.content
+        )  # Should have responsive images with new naming convention
 
     async def test_simple_responsive_img_mode(
         self,
@@ -493,7 +495,7 @@ class TestImageEncodingPlugin:
             formats=["webp"],
             use_picture_element=False,
             generate_responsive=True,
-            responsive_sizes=[480, 768, 1024],
+            responsive_sizes=[400, 800, 1200],
         )
 
         # Create test image
@@ -523,5 +525,95 @@ class TestImageEncodingPlugin:
         assert 'srcset="' in result.content
         assert 'sizes="' in result.content
         # At least some responsive image should be generated
-        assert "test-" in result.content  # Responsive images with sizes
+        assert (
+            "test_test_" in result.content
+        )  # Responsive images with new naming convention
         assert ".webp" in result.content
+
+    async def test_multiple_responsive_sizes_generated(
+        self,
+        temp_dir: Path,
+        site_config: ScribeConfig,
+    ) -> None:
+        """Test that multiple responsive sizes are actually generated for large images."""
+        # Create config with explicit responsive sizes - use smaller, more realistic sizes for testing
+        config = ImageEncodingPluginConfig(
+            name="image_encoding",
+            cache_dir=str(temp_dir / "cache"),
+            formats=["webp"],
+            quality_webp=85,
+            generate_responsive=True,
+            responsive_sizes=[400, 600, 800, 1200],  # Smaller set for testing
+            verbose=True,  # Enable verbose logging to see what's happening
+        )
+
+        # Create a reasonably sized test image (1800x1200) - large enough for all responsive sizes
+        # Use a simple solid color image to avoid complex pattern issues
+        img = pyvips.Image.black(1800, 1200, bands=3)
+        # Add some color to make it a valid RGB image
+        img = img + [100, 150, 200]  # Simple way to add color
+        image_path = temp_dir / "static" / "test_photo.png"
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        img.write_to_file(str(image_path))
+
+        # Create page context
+        source_path = temp_dir / "source" / "test.md"
+        source_path.write_text("content")
+
+        ctx = PageContext(
+            source_path=source_path,
+            relative_path=Path("test.md"),
+            output_path=temp_dir / "output" / "test.html",
+            raw_content='<p><img src="test_photo.png" alt="Test photo"></p>',
+            content='<p><img src="test_photo.png" alt="Test photo"></p>',
+            slug="responsive-test",
+        )
+
+        plugin = ImageEncodingPlugin(config, site_config)
+        result = await plugin.process(ctx)
+
+        # Verify multiple responsive sizes were generated
+        assert result.image_encoding_data is not None
+        responsive_images = result.image_encoding_data.responsive_images
+        assert "test_photo.png" in responsive_images
+
+        generated_sizes = list(responsive_images["test_photo.png"].keys())
+        print(f"Generated sizes: {sorted(generated_sizes)}")
+        
+        # Should have generated multiple sizes (all that fit within 1800px width)
+        expected_sizes = [400, 600, 800, 1200]  # All should fit in 1800px
+        assert len(generated_sizes) >= 3, f"Expected at least 3 sizes, got {len(generated_sizes)}: {generated_sizes}"
+        
+        # Verify specific sizes are present
+        for expected_size in [400, 600, 800]:
+            assert expected_size in generated_sizes, f"Missing {expected_size}px size in {generated_sizes}"
+
+        # Check that srcset contains multiple sizes
+        srcset_content = result.content
+        assert "400w" in srcset_content, "Missing 400w in srcset"
+        assert "600w" in srcset_content, "Missing 600w in srcset"
+        assert "800w" in srcset_content, "Missing 800w in srcset"
+
+        # Verify files were actually written to output directory
+        output_images_dir = temp_dir / "output" / "images"
+        assert output_images_dir.exists(), "Output images directory not created"
+        
+        output_files = list(output_images_dir.glob("*.webp"))
+        print(f"Output files: {[f.name for f in output_files]}")
+        
+        # Should have multiple WebP files
+        assert len(output_files) >= 3, f"Expected at least 3 output files, got {len(output_files)}"
+        
+        # Check specific files exist
+        expected_files = [
+            "responsive-test_testphoto_400.webp",
+            "responsive-test_testphoto_600.webp", 
+            "responsive-test_testphoto_800.webp",
+        ]
+        
+        for expected_file in expected_files:
+            expected_path = output_images_dir / expected_file
+            assert expected_path.exists(), f"Missing output file: {expected_file}"
+            
+            # Verify file has content
+            assert expected_path.stat().st_size > 0, f"Empty output file: {expected_file}"

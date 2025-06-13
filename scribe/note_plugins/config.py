@@ -169,16 +169,18 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
         - "avif"
         - "webp"
       quality_avif: 65
-      quality_webp: 80
+      quality_webp: 85
       max_width: null
       max_height: null
       generate_responsive: true
       responsive_sizes:
-        - 480
-        - 768
-        - 1024
+        - 400
+        - 600
+        - 800
         - 1200
-      default_sizes: "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        - 1600
+        - 2400
+      default_sizes: "(max-width: 400px) 100vw, (max-width: 800px) 50vw, 33vw"
       use_picture_element: true
       add_loading_lazy: true
       verbose: false
@@ -199,7 +201,7 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
         default=65, ge=1, le=100, description="AVIF quality setting (1-100)"
     )
     quality_webp: int = Field(
-        default=80, ge=1, le=100, description="WebP quality setting (1-100)"
+        default=85, ge=1, le=100, description="WebP quality setting (1-100)"
     )
     max_width: int | None = Field(
         default=None, description="Maximum width for resizing images"
@@ -211,11 +213,11 @@ class ImageEncodingPluginConfig(BaseNotePluginConfig):
         default=True, description="Generate responsive image sizes"
     )
     responsive_sizes: list[int] = Field(
-        default_factory=lambda: [480, 768, 1024, 1200],
-        description="Responsive image widths to generate",
+        default_factory=lambda: [400, 600, 800, 1200, 1600, 2400],
+        description="Responsive image widths to generate (retina-optimized)",
     )
     default_sizes: str = Field(
-        default="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw",
+        default="(max-width: 400px) 100vw, (max-width: 800px) 50vw, 33vw",
         description="Default sizes attribute for responsive images",
     )
     use_picture_element: bool = Field(
