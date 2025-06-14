@@ -577,17 +577,34 @@ class ImageEncodingPlugin(NotePlugin[ImageEncodingPluginConfig]):
         responsive_images: dict[str, dict[int, str]],
         ctx: PageContext,
     ) -> list[str]:
-        """Update featured_photos to point to converted images (use largest size)."""
+        """Update featured_photos to point to converted images.
+
+        Uses ~1000px size for optimal performance.
+        """
         updated_photos = []
         for photo in featured_photos:
             if photo in responsive_images and responsive_images[photo]:
-                # Use largest size
+                # Find size closest to 1000px
+                # (prefer >= 1000px, otherwise largest available)
                 sizes = sorted(responsive_images[photo].keys())
-                largest_size = sizes[-1]
-                new_src = responsive_images[photo][largest_size]
+                target_size = 1000
+
+                # Find sizes >= target_size
+                suitable_sizes = [s for s in sizes if s >= target_size]
+                if suitable_sizes:
+                    # Use smallest size that's >= 1000px
+                    chosen_size = min(suitable_sizes)
+                else:
+                    # Use largest available size if none >= 1000px
+                    chosen_size = sizes[-1]
+
+                new_src = responsive_images[photo][chosen_size]
                 updated_photos.append(new_src)
                 if self.config.verbose:
-                    logger.debug(f"Updated featured photo: {photo} -> {new_src}")
+                    logger.debug(
+                        f"Updated featured photo: {photo} -> {new_src} "
+                        f"({chosen_size}px)"
+                    )
             else:
                 # Keep original if not processed
                 updated_photos.append(photo)
