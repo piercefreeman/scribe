@@ -630,3 +630,148 @@ class TestImageEncodingPlugin:
             assert expected_path.stat().st_size > 0, (
                 f"Empty output file: {expected_file}"
             )
+
+    async def test_update_featured_photos_1000px_logic(
+        self,
+        temp_dir: Path,
+        site_config: ScribeConfig,
+    ) -> None:
+        """Test that _update_featured_photos uses ~1000px images.
+
+        This ensures optimal performance by avoiding large image downloads.
+        """
+        # Create config with responsive sizes that include options around 1000px
+        config = ImageEncodingPluginConfig(
+            name="image_encoding",
+            cache_dir=str(temp_dir / "cache"),
+            formats=["webp"],
+            generate_responsive=True,
+            responsive_sizes=[480, 768, 1024, 1200, 1600],
+            verbose=True,
+        )
+
+        # Create test images
+        large_img = pyvips.Image.black(2000, 1500, bands=3) + [100, 150, 200]
+        medium_img = pyvips.Image.black(900, 600, bands=3) + [200, 100, 150]
+
+        large_image_path = temp_dir / "static" / "large_photo.png"
+        medium_image_path = temp_dir / "static" / "medium_photo.png"
+
+        large_image_path.parent.mkdir(parents=True, exist_ok=True)
+        large_img.write_to_file(str(large_image_path))
+        medium_img.write_to_file(str(medium_image_path))
+
+        # Create page context with featured_photos
+        source_path = temp_dir / "source" / "test.md"
+        source_path.write_text("content")
+
+        ctx = PageContext(
+            source_path=source_path,
+            relative_path=Path("test.md"),
+            output_path=temp_dir / "output" / "test.html",
+            raw_content="<p>Content with no images in text</p>",
+            content="<p>Content with no images in text</p>",
+            featured_photos=["large_photo.png", "medium_photo.png"],
+            slug="featured-test",
+        )
+
+        plugin = ImageEncodingPlugin(config, site_config)
+        result = await plugin.process(ctx)
+
+        # Verify featured photos were processed
+        assert len(result.featured_photos) == 2
+        assert result.image_encoding_data is not None
+
+        # Get the responsive images data to check what sizes were generated
+        responsive_images = result.image_encoding_data.responsive_images
+
+        # Test case 1: Large image (2000px) should have multiple sizes
+        # including >= 1000px
+        large_sizes = list(responsive_images["large_photo.png"].keys())
+        print(f"Large image sizes: {sorted(large_sizes)}")
+
+        # Should include 1024px or 1200px (smallest >= 1000px)
+        sizes_ge_1000 = [size for size in large_sizes if size >= 1000]
+        assert len(sizes_ge_1000) > 0, (
+            f"Large image should have sizes >= 1000px: {large_sizes}"
+        )
+
+        # Featured photo should use the smallest size >= 1000px
+        expected_size = min(sizes_ge_1000)
+        large_featured_url = result.featured_photos[0]  # First is large_photo.png
+        assert f"_{expected_size}.webp" in large_featured_url, (
+            f"Featured photo should use {expected_size}px, got: {large_featured_url}"
+        )
+
+        # Test case 2: Medium image (900px) has no sizes >= 1000px,
+        # should use largest available
+        medium_sizes = list(responsive_images["medium_photo.png"].keys())
+        print(f"Medium image sizes: {sorted(medium_sizes)}")
+
+        # Should not have sizes >= 1000px (since original is 900px)
+        sizes_ge_1000_medium = [size for size in medium_sizes if size >= 1000]
+        assert len(sizes_ge_1000_medium) == 0, (
+            f"Medium image (900px) should not have sizes >= 1000px: "
+            f"{sizes_ge_1000_medium}"
+        )
+
+        # Featured photo should use the largest available size
+        largest_size = max(medium_sizes)
+        medium_featured_url = result.featured_photos[1]  # Second is medium_photo.png
+        assert f"_{largest_size}.webp" in medium_featured_url, (
+            f"Featured photo should use largest size {largest_size}px, "
+            f"got: {medium_featured_url}"
+        )
+
+    async def test_update_featured_photos_edge_cases(
+        self,
+        temp_dir: Path,
+        site_config: ScribeConfig,
+    ) -> None:
+        """Test edge cases for featured photos size selection."""
+        config = ImageEncodingPluginConfig(
+            name="image_encoding",
+            cache_dir=str(temp_dir / "cache"),
+            formats=["webp"],
+            generate_responsive=True,
+            responsive_sizes=[480, 768, 1000, 1024],  # Include exactly 1000px
+        )
+
+        # Create test image exactly 1200px wide
+        img = pyvips.Image.black(1200, 800, bands=3) + [150, 100, 200]
+        image_path = temp_dir / "static" / "exact_test.png"
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        img.write_to_file(str(image_path))
+
+        # Create page context
+        source_path = temp_dir / "source" / "test.md"
+        source_path.write_text("content")
+
+        ctx = PageContext(
+            source_path=source_path,
+            relative_path=Path("test.md"),
+            output_path=temp_dir / "output" / "test.html",
+            raw_content="<p>Content</p>",
+            content="<p>Content</p>",
+            featured_photos=["exact_test.png"],
+            slug="edge-test",
+        )
+
+        plugin = ImageEncodingPlugin(config, site_config)
+        result = await plugin.process(ctx)
+
+        # Should have responsive images
+        responsive_images = result.image_encoding_data.responsive_images
+        sizes = list(responsive_images["exact_test.png"].keys())
+        print(f"Edge case sizes: {sorted(sizes)}")
+
+        # Should include 1000px and 1024px (both >= 1000px)
+        sizes_ge_1000 = [size for size in sizes if size >= 1000]
+        assert 1000 in sizes_ge_1000, f"Should include 1000px: {sizes}"
+        assert 1024 in sizes_ge_1000, f"Should include 1024px: {sizes}"
+
+        # Featured photo should use 1000px (smallest >= 1000px)
+        featured_url = result.featured_photos[0]
+        assert "_1000.webp" in featured_url, (
+            f"Should use 1000px (smallest >= 1000px), got: {featured_url}"
+        )
