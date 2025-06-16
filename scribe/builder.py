@@ -40,6 +40,57 @@ console = Console()
 logger = get_logger(__name__)
 
 
+def _get_output_path_from_input_path(input_path: Path) -> Path:
+    """
+    Convert input path to output path for regular pages/templates.
+
+    Note: This function is intended for base templates and static pages, NOT for the
+    notes pipeline which has its own transformation logic (always .md -> .html).
+
+    The output path mirrors the input path unless there is a jinja-specific suffix,
+    in which case that suffix is stripped and replaced with .html.
+
+    Args:
+        input_path: The input file path (relative path)
+
+    Returns:
+        The output file path with appropriate suffix transformations
+
+    Examples:
+        - 'template.j2' -> 'template.html' (jinja templates become HTML)
+        - 'layout.jinja' -> 'layout.html' (jinja templates become HTML)
+        - 'index.html.j2' -> 'index.html' (compound jinja suffix stripped)
+        - 'style.css' -> 'style.css' (other files mirror input)
+        - 'post.md' -> 'post.html' (markdown files become HTML)
+    """
+    # Define jinja-specific suffixes that should be stripped
+    jinja_suffixes = {".j2", ".jinja", ".jinja2"}
+
+    # Check if file has a jinja suffix
+    if input_path.suffix in jinja_suffixes:
+        # For jinja suffixes, strip the jinja suffix by removing it from the name
+        # This handles compound suffixes like .html.j2 -> .html correctly
+        stem_with_previous_suffix = input_path.name[: -len(input_path.suffix)]
+
+        # Check if the remaining part ends with a web-friendly extension
+        remaining_path = Path(stem_with_previous_suffix)
+        web_friendly_extensions = {".html", ".css", ".js", ".json", ".xml", ".txt"}
+
+        if remaining_path.suffix in web_friendly_extensions:
+            # It already has a web-friendly extension, keep it as-is
+            return input_path.with_name(stem_with_previous_suffix)
+        else:
+            # No web-friendly extension, add .html
+            return input_path.with_name(stem_with_previous_suffix + ".html")
+
+    # Handle markdown files
+    if input_path.suffix in {".md", ".markdown"}:
+        return input_path.with_suffix(".html")
+
+    # For all other files, mirror the input path
+    return input_path
+
+
 class SiteBuilder:
     """Main builder class for processing files and generating static site."""
 
@@ -314,7 +365,7 @@ class SiteBuilder:
         # Calculate relative path from source directory
         relative_path = file_path.relative_to(self.config.source_dir)
 
-        # Calculate output path (replace .md with .html)
+        # Calculate output path (replace .md with .html for notes pipeline)
         output_relative = relative_path.with_suffix(".html")
         output_path = self.config.output_dir / output_relative
 
@@ -350,10 +401,10 @@ class SiteBuilder:
                 # Render template
                 rendered_content = template.render(**global_context)
 
-                # Determine output path
-                output_path = self.config.output_dir / Path(template_path).with_suffix(
-                    ".html"
-                )
+                # Determine output path using standardized path transformation
+                output_relative = _get_output_path_from_input_path(Path(template_path))
+                output_path = self.config.output_dir / output_relative
+
                 output_path.parent.mkdir(parents=True, exist_ok=True)
 
                 # Write output
