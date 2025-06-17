@@ -184,10 +184,12 @@ class SnapshotPlugin(NotePlugin[SnapshotPluginConfig]):
         # In production mode, only use cached snapshots - don't attempt new crawls
         if self._is_production_mode():
             logger.info(
-                f"Production mode: Skipping crawl for {url} - relying on cached snapshots only"
+                f"Production mode: Skipping crawl for {url} - "
+                f"relying on cached snapshots only"
             )
             console.print(
-                f"[blue]Production mode: Skipping crawl for {url} - cached snapshots only[/blue]"
+                f"[blue]Production mode: Skipping crawl for {url} - "
+                f"cached snapshots only[/blue]"
             )
             return
 

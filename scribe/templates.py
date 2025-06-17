@@ -15,14 +15,23 @@ class NotesAccessor:
         notes: list[PageContext],
         predicate_matcher: PredicateMatcher,
     ):
-        # Sort notes by date, treating None dates as oldest
-        def get_sort_date(note: PageContext) -> datetime:
+        # Sort notes by date (newest first), then by title (A-Z) for tie-breaking
+        def get_sort_key(note: PageContext) -> tuple[datetime, str]:
+            # Get the date
             if note.date_data and note.date_data.parsed:
-                return note.date_data.parsed
-            # Use a very old date for notes without date_data
-            return datetime(1900, 1, 1)
+                date = note.date_data.parsed
+            else:
+                # Use a very old date for notes without date_data
+                date = datetime(1900, 1, 1)
 
-        self.notes = sorted(notes, key=get_sort_date, reverse=True)
+            # Get the title for tie-breaking (case-insensitive)
+            title = (note.title or note.source_path.stem or "").lower()
+
+            # Return negative date for descending order,
+            # positive title for ascending order
+            return (-date.timestamp(), title)
+
+        self.notes = sorted(notes, key=get_sort_key)
         self.predicate_matcher = predicate_matcher
 
     def all(self) -> list[dict[str, Any]]:
