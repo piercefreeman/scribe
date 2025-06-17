@@ -1,15 +1,35 @@
 """Configuration management for Scribe."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    YamlConfigSettingsSource,
+)
 
 from .build_plugins.config import BuildPluginConfig
 from .note_plugins.config import PluginConfig
 from .paths import resolve_paths_recursively
+
+
+class CustomYamlConfigSettingsSource(YamlConfigSettingsSource):
+    """Custom YAML config source that allows dynamic file path."""
+
+    def __init__(self, settings_cls: type[BaseSettings], yaml_file: Path | None):
+        super().__init__(settings_cls)
+        self.yaml_file = yaml_file
+
+    def __call__(self) -> dict[str, Any]:
+        if self.yaml_file and self.yaml_file.exists():
+            return yaml.safe_load(self.yaml_file.read_text())
+        return {}
 
 
 class NoteTemplate(BaseModel):
@@ -112,7 +132,12 @@ class ScribeConfig(BaseSettings):
         default=True, description="Clean output directory before building"
     )
 
+    _custom_config_file: Path | None = None
+
     def __init__(self, config_file: Path | None = None, **kwargs: Any) -> None:
+        # Check if environment was explicitly passed in kwargs
+        environment_passed_in_kwargs = "environment" in kwargs
+
         # If custom config file is provided, load from it using PyYAML directly
         if config_file is not None and config_file.exists():
             import yaml
@@ -127,6 +152,15 @@ class ScribeConfig(BaseSettings):
                 pass
 
         super().__init__(**kwargs)
+
+        # Only override with env var if environment was not explicitly passed in kwargs
+        # This maintains precedence: kwargs > env vars > config file > defaults
+        if not environment_passed_in_kwargs:
+            import os
+
+            env_environment = os.getenv("SCRIBE_ENVIRONMENT")
+            if env_environment:
+                self.environment = env_environment
 
         # Store the custom config file path after super().__init__
         self._custom_config_file = config_file
@@ -170,3 +204,23 @@ class ScribeConfig(BaseSettings):
 
         with open(config_path, "w") as f:
             yaml.dump(config_dict, f, default_flow_style=False, indent=2)
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # Get the config_file from init_settings
+        config_file = init_settings.init_kwargs.get("config_file")
+
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            CustomYamlConfigSettingsSource(settings_cls, config_file),
+            file_secret_settings,
+        )
