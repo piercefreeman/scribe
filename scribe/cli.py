@@ -16,6 +16,72 @@ from scribe.watcher import DevServer
 console = Console()
 
 
+def _log_config(config: ScribeConfig) -> None:
+    """Log the current configuration during build."""
+    console.print("\n[bold blue]Current Configuration:[/bold blue]")
+
+    # Create a table for configuration display
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column("Setting", style="dim", width=25)
+    table.add_column("Value", style="white")
+
+    # Core settings
+    table.add_row("Config file:", str(config.config_file_path))
+    table.add_row("Environment:", config.environment)
+    table.add_row("Source directory:", str(config.source_dir))
+    table.add_row("Output directory:", str(config.output_dir))
+    table.add_row("Clean output:", "✓" if config.clean_output else "✗")
+
+    # Site metadata
+    table.add_row("Site title:", config.site_title)
+    table.add_row("Site description:", config.site_description or "[dim]Not set[/dim]")
+    table.add_row("Site URL:", config.site_url or "[dim]Not set[/dim]")
+
+    # Development server
+    table.add_row("Dev server host:", config.host)
+    table.add_row("Dev server port:", str(config.port))
+
+    # Template settings
+    if config.templates:
+        table.add_row("Template path:", str(config.templates.template_path))
+        table.add_row("Base templates:", str(len(config.templates.base_templates)))
+        table.add_row("Note templates:", str(len(config.templates.note_templates)))
+    else:
+        table.add_row("Templates:", "[dim]Not configured[/dim]")
+
+    # Static path
+    if config.static_path:
+        table.add_row("Static path:", str(config.static_path))
+    else:
+        table.add_row("Static path:", "[dim]Not configured[/dim]")
+
+    console.print(table)
+
+    # Note plugins
+    if config.note_plugins:
+        console.print("\n[bold]Note Plugins:[/bold]")
+        for plugin in config.note_plugins:
+            status = (
+                "[green]enabled[/green]" if plugin.enabled else "[red]disabled[/red]"
+            )
+            console.print(f"  • [cyan]{plugin.name}[/cyan] ({status})")
+    else:
+        console.print("\n[bold]Note Plugins:[/bold] [dim]Using defaults[/dim]")
+
+    # Build plugins
+    if config.build_plugins:
+        console.print("\n[bold]Build Plugins:[/bold]")
+        for plugin in config.build_plugins:
+            status = (
+                "[green]enabled[/green]" if plugin.enabled else "[red]disabled[/red]"
+            )
+            console.print(f"  • [cyan]{plugin.name}[/cyan] ({status})")
+    else:
+        console.print("\n[bold]Build Plugins:[/bold] [dim]Using defaults[/dim]")
+
+    console.print()  # Add spacing after config
+
+
 @click.group()
 @click.version_option()
 def main() -> None:
@@ -48,6 +114,9 @@ def build(config: Path | None, clean: bool) -> None:
 
     # Override config with CLI options
     site_config.clean_output = clean
+
+    # Log the current configuration
+    _log_config(site_config)
 
     async def _build() -> None:
         builder = SiteBuilder(site_config)

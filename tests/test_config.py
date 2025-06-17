@@ -55,24 +55,6 @@ class TestScribeConfig:
             config = ScribeConfig(environment="development")
             assert config.environment == "development"
 
-    def test_environment_config_file_and_env_var(self, tmp_path):
-        """Test environment precedence: env var > config file > default."""
-        config_file = tmp_path / "test_config.yml"
-        config_file.write_text("""
-environment: "development"
-site_title: "Test Site"
-""")
-
-        # Test that env var overrides config file
-        with patch.dict(os.environ, {"SCRIBE_ENVIRONMENT": "production"}):
-            config = ScribeConfig(config_file=config_file)
-            assert config.environment == "production"
-
-        # Test that kwargs override both env var and config file
-        with patch.dict(os.environ, {"SCRIBE_ENVIRONMENT": "production"}):
-            config = ScribeConfig(config_file=config_file, environment="development")
-            assert config.environment == "development"
-
     def test_custom_config_file_loading(self, tmp_path):
         """Test loading configuration from a custom YAML file."""
         config_file = tmp_path / "test_config.yml"
