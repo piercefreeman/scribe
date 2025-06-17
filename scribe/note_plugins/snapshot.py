@@ -6,6 +6,7 @@ from asyncio import TimeoutError as AsyncTimeoutError
 from datetime import datetime
 from hashlib import md5
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
@@ -15,6 +16,9 @@ from scribe.context import PageContext
 from scribe.logger import get_logger
 from scribe.note_plugins.base import NotePlugin
 from scribe.note_plugins.config import PluginName, SnapshotPluginConfig
+
+if TYPE_CHECKING:
+    from scribe.config import ScribeConfig
 
 console = Console()
 logger = get_logger(__name__)
@@ -77,7 +81,9 @@ class SnapshotPlugin(NotePlugin[SnapshotPluginConfig]):
 
     name = PluginName.SNAPSHOT
 
-    def __init__(self, config: SnapshotPluginConfig) -> None:
+    def __init__(
+        self, config: SnapshotPluginConfig, global_config: "ScribeConfig | None" = None
+    ) -> None:
         super().__init__(config)
 
         # Get configuration values directly from typed config
@@ -87,6 +93,9 @@ class SnapshotPlugin(NotePlugin[SnapshotPluginConfig]):
         self.max_attempts = config.max_attempts
         self.headful = config.headful
         self.enabled = config.enabled
+
+        # Store global config to check environment
+        self.global_config = global_config
 
     async def process(self, ctx: PageContext) -> PageContext:
         """Process content to find URLs and take snapshots."""
@@ -99,6 +108,13 @@ class SnapshotPlugin(NotePlugin[SnapshotPluginConfig]):
             ctx = self._update_links_with_metadata(ctx, urls)
 
         return ctx
+
+    def _is_production_mode(self) -> bool:
+        """Check if we're running in production mode."""
+        return (
+            self.global_config is not None
+            and self.global_config.environment == "production"
+        )
 
     def _extract_urls_from_content(self, content: str) -> set[str]:
         """
@@ -164,6 +180,16 @@ class SnapshotPlugin(NotePlugin[SnapshotPluginConfig]):
                     f"({self.max_attempts})[/red]"
                 )
                 return
+
+        # In production mode, only use cached snapshots - don't attempt new crawls
+        if self._is_production_mode():
+            logger.info(
+                f"Production mode: Skipping crawl for {url} - relying on cached snapshots only"
+            )
+            console.print(
+                f"[blue]Production mode: Skipping crawl for {url} - cached snapshots only[/blue]"
+            )
+            return
 
         async with semaphore:
             try:

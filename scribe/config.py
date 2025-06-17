@@ -1,7 +1,7 @@
 """Configuration management for Scribe."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -53,6 +53,13 @@ class ScribeConfig(BaseSettings):
         yaml_file=Path.home() / ".scribe" / "config.yml",
         yaml_file_encoding="utf-8",
         case_sensitive=False,
+    )
+
+    # Environment setting
+    environment: Literal["development", "production"] = Field(
+        default="development",
+        description="Environment mode - affects behavior of certain plugins "
+        "(controlled by SCRIBE_ENVIRONMENT env var)",
     )
 
     # Source and output directories
