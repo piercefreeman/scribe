@@ -1,6 +1,7 @@
 """Core builder for processing markdown files and generating static site."""
 
 import asyncio
+import re
 import shutil
 from collections.abc import Callable
 from datetime import datetime
@@ -177,6 +178,9 @@ class SiteBuilder:
         self.jinja_env = Environment(
             loader=FileSystemLoader(str(template_path)), autoescape=True
         )
+
+        # Add custom filters
+        self.jinja_env.filters["regex_replace"] = self._regex_replace
 
         # Setup predicate functions from the predicate matcher
         self.predicate_functions = self.predicate_matcher.predicate_functions
@@ -713,3 +717,7 @@ class SiteBuilder:
 
         # If no file found in error message, use a generic key
         return "unknown_file"
+
+    @staticmethod
+    def _regex_replace(s: str, find: str, replace: str) -> str:
+        return re.sub(find, replace, s)
