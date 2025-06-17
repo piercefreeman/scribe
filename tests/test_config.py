@@ -1,5 +1,6 @@
 """Tests for ScribeConfig class."""
 
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -35,6 +36,42 @@ class TestScribeConfig:
         custom_path.touch()  # Create the file
         config = ScribeConfig(config_file=custom_path)
         assert config.config_file_path == custom_path
+
+    def test_environment_from_env_var(self):
+        """Test that SCRIBE_ENVIRONMENT environment variable sets the environment."""
+        # Test production environment
+        with patch.dict(os.environ, {"SCRIBE_ENVIRONMENT": "production"}):
+            config = ScribeConfig()
+            assert config.environment == "production"
+
+        # Test development environment
+        with patch.dict(os.environ, {"SCRIBE_ENVIRONMENT": "development"}):
+            config = ScribeConfig()
+            assert config.environment == "development"
+
+    def test_environment_kwargs_override_env_var(self):
+        """Test that explicit kwargs override environment variables."""
+        with patch.dict(os.environ, {"SCRIBE_ENVIRONMENT": "production"}):
+            config = ScribeConfig(environment="development")
+            assert config.environment == "development"
+
+    def test_environment_config_file_and_env_var(self, tmp_path):
+        """Test environment precedence: env var > config file > default."""
+        config_file = tmp_path / "test_config.yml"
+        config_file.write_text("""
+environment: "development"
+site_title: "Test Site"
+""")
+
+        # Test that env var overrides config file
+        with patch.dict(os.environ, {"SCRIBE_ENVIRONMENT": "production"}):
+            config = ScribeConfig(config_file=config_file)
+            assert config.environment == "production"
+
+        # Test that kwargs override both env var and config file
+        with patch.dict(os.environ, {"SCRIBE_ENVIRONMENT": "production"}):
+            config = ScribeConfig(config_file=config_file, environment="development")
+            assert config.environment == "development"
 
     def test_custom_config_file_loading(self, tmp_path):
         """Test loading configuration from a custom YAML file."""
