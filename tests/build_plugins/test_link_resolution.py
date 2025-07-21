@@ -152,6 +152,42 @@ class TestLinkResolver:
         link = PageLink(url="first-note.md")
         result = resolver.resolve(link, sample_context)
         assert result == "/notes/first-note/"
+        
+    def test_resolve_url_encoded_links(self):
+        """Test resolution of URL-encoded links (e.g., spaces as %20)."""
+        slug_map = {
+            "Building our home network": "/notes/building-home-network/",
+            "Building our home network.md": "/notes/building-home-network/",
+            "home_network/Building our home network": "/notes/building-home-network/",
+            "home_network/Building our home network.md": "/notes/building-home-network/",
+        }
+        resolver = LinkResolver(slug_map)
+        
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            source_file = temp_path / "test.md"
+            source_file.touch()
+            
+            # Create the target file with spaces in name
+            home_network_dir = temp_path / "home_network"
+            home_network_dir.mkdir()
+            target_file = home_network_dir / "Building our home network.md"
+            target_file.touch()
+            
+            ctx = PageContext(
+                source_path=source_file,
+                relative_path=Path("test.md"),
+                output_path=temp_path / "output" / "test.html",
+                content="",
+                raw_content="",
+                slug="test",
+            )
+            
+            # Test URL-encoded link resolution
+            link = PageLink(url="./home_network/Building%20our%20home%20network.md")
+            result = resolver.resolve(link, ctx)
+            assert result == "/notes/building-home-network/"
 
     def test_resolve_no_match_raises_error(self, slug_map, sample_context):
         """Test that resolution raises error when no match is found for relative links."""

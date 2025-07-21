@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import unquote
 
 from bs4 import BeautifulSoup
 
@@ -145,6 +146,8 @@ class LinkResolver:
     def _clean_url(self, url: str) -> str:
         """Clean and normalize a URL."""
         url = url.strip()
+        # Decode URL-encoded characters
+        url = unquote(url)
         if url.endswith(".md"):
             url = url[:-3]
         return url
@@ -189,23 +192,36 @@ class LinkResolver:
         resolved_url = self.slug_map.get(normalized_path)
         if resolved_url:
             return resolved_url
+            
+        # Try with .md extension (for IDE-friendly links)
+        resolved_url = self.slug_map.get(normalized_path + ".md")
+        if resolved_url:
+            return resolved_url
 
         # Try just filename
         filename_only = Path(normalized_path).name
-        return self.slug_map.get(filename_only)
+        resolved_url = self.slug_map.get(filename_only)
+        if resolved_url:
+            return resolved_url
+            
+        # Try filename with .md extension
+        return self.slug_map.get(filename_only + ".md")
 
     def _check_md_file_exists(self, original_url: str, ctx: PageContext) -> None:
         """Check if a .md file exists on disk and raise exception if not."""
+        # Decode URL-encoded characters (e.g., %20 -> space)
+        decoded_url = unquote(original_url)
+        
         # Handle different types of paths
-        if original_url.startswith("./") or original_url.startswith("../"):
+        if decoded_url.startswith("./") or decoded_url.startswith("../"):
             # Relative path
             current_dir = ctx.source_path.parent
-            target_path = current_dir / original_url
+            target_path = current_dir / decoded_url
             resolved_path = target_path.resolve()
         else:
             # Assume it's relative to the current file's directory
             current_dir = ctx.source_path.parent
-            target_path = current_dir / original_url
+            target_path = current_dir / decoded_url
             resolved_path = target_path.resolve()
 
         if not resolved_path.exists():
