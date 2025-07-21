@@ -36,6 +36,10 @@ class PageLink:
     def should_resolve(self) -> bool:
         """Check if this link should be resolved."""
         return not self.is_external() and not self.is_anchor()
+    
+    def is_absolute(self) -> bool:
+        """Check if this is an absolute path link."""
+        return self.url.startswith("/")
 
 
 class UrlBuilder:
@@ -86,6 +90,7 @@ class LinkResolver:
         # Try different resolution strategies in order
         strategies = [
             self._direct_lookup,
+            self._absolute_path_resolution,
             self._relative_path_resolution,
         ]
 
@@ -94,14 +99,32 @@ class LinkResolver:
             if resolved_url:
                 return resolved_url
 
-        # If we couldn't resolve the link, raise an error
-        # This applies to both .md links and non-.md links that look like internal references
+        # If we couldn't resolve the link, check what type of error to raise
         if was_md_link:
             # For .md files, check if the file exists and provide a helpful error
             self._check_md_file_exists(original_url, ctx)
+            # If the file exists but wasn't in our slug map, that's a different issue
+            # The file exists but isn't being processed by the build
+            raise ValueError(
+                f"\n❌ Link Resolution Error\n"
+                f"  File: {ctx.source_path}\n"
+                f"  Broken link: '{original_url}'\n"
+                f"  Error: Markdown file exists but is not included in the build!\n"
+                f"\nPossible reasons:\n"
+                f"  - File is outside the source directory\n"
+                f"  - File is excluded by configuration\n"
+                f"  - File failed to process due to errors"
+            )
             
-        # If we reach here, the link couldn't be resolved
-        # Raise an error to prevent broken links in production
+        # For non-.md links that we couldn't resolve
+        # Only raise an error if it looks like an internal page reference
+        # Absolute paths that aren't .md files should be allowed to pass through
+        if link.is_absolute() and not was_md_link:
+            # This is an absolute path like /about or /api/docs
+            # Allow it to pass through - it might be handled by the web server
+            return original_url
+            
+        # For relative paths and other internal references, raise an error
         available_pages = "\n".join(f"  - {page}" for page in sorted(self.slug_map.keys())[:10])
         more_pages = f"\n  ... and {len(self.slug_map) - 10} more pages" if len(self.slug_map) > 10 else ""
         
@@ -111,9 +134,11 @@ class LinkResolver:
             f"  Broken link: '{original_url}'\n"
             f"  Error: Could not resolve this internal link!\n"
             f"\nThe link should match one of these patterns:\n"
-            f"  - Filename without extension: 'my-page' (not 'my-page.md')\n"
-            f"  - Relative path without extension: './subfolder/my-page'\n"
+            f"  - Filename with extension: 'my-page.md' (for IDE support)\n"
+            f"  - Filename without extension: 'my-page'\n"
+            f"  - Relative path: './subfolder/my-page.md' or './subfolder/my-page'\n"
             f"  - Page title: 'My Page Title'\n"
+            f"  - Absolute path: '/about' (for site pages)\n"
             f"\nAvailable pages:\n{available_pages}{more_pages}"
         )
 
@@ -127,6 +152,26 @@ class LinkResolver:
     def _direct_lookup(self, url: str, ctx: PageContext) -> str | None:
         """Try direct lookup in slug map."""
         return self.slug_map.get(url)
+    
+    def _absolute_path_resolution(self, url: str, ctx: PageContext) -> str | None:
+        """Try absolute path resolution."""
+        if not url.startswith("/"):
+            return None
+            
+        # Remove leading slash for lookup
+        path_without_slash = url[1:]
+        
+        # Try direct lookup first
+        if path_without_slash in self.slug_map:
+            return self.slug_map[path_without_slash]
+            
+        # For absolute paths, we should return them as-is if they're valid
+        # site URLs (not .md files)
+        if not url.endswith(".md"):
+            # This is likely a valid absolute URL like /about or /blog/
+            return url
+            
+        return None
 
     def _relative_path_resolution(self, url: str, ctx: PageContext) -> str | None:
         """Try relative path resolution."""
@@ -235,9 +280,12 @@ class PageSlugMapBuilder:
             for mapping in mappings:
                 slug_map[mapping] = final_url
 
-            logger.debug(
-                f"Mapped page {ctx.relative_path.with_suffix('')} -> {final_url}"
-            )
+            # Only log if debug level is enabled
+            if logger.isEnabledFor(10):  # DEBUG level
+                logger.debug(
+                    f"Mapped page {ctx.relative_path} -> {final_url} "
+                    f"(mappings: {len(mappings)})"
+                )
 
         return slug_map
 
@@ -245,10 +293,18 @@ class PageSlugMapBuilder:
         """Get all possible mappings for a context."""
         mappings = []
 
+        # Full relative path with extension (for IDE support)
+        relative_path_with_ext = str(ctx.relative_path)
+        mappings.append(relative_path_with_ext)
+        
         # Relative path without extension
         relative_path_no_ext = str(ctx.relative_path.with_suffix(""))
         mappings.append(relative_path_no_ext)
 
+        # Filename with extension (for IDE support)
+        filename_with_ext = ctx.source_path.name
+        mappings.append(filename_with_ext)
+        
         # Filename without extension
         filename_no_ext = ctx.source_path.stem
         mappings.append(filename_no_ext)
@@ -256,6 +312,11 @@ class PageSlugMapBuilder:
         # Title if available
         if ctx.title:
             mappings.append(ctx.title)
+            
+        # Add absolute path mappings (without leading slash)
+        # This helps with links like /about mapping to about.md
+        if not str(ctx.relative_path).startswith("/"):
+            mappings.append(relative_path_no_ext)
 
         return mappings
 

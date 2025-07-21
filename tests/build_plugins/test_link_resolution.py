@@ -154,12 +154,25 @@ class TestLinkResolver:
         assert result == "/notes/first-note/"
 
     def test_resolve_no_match_raises_error(self, slug_map, sample_context):
-        """Test that resolution raises error when no match is found."""
+        """Test that resolution raises error when no match is found for relative links."""
         resolver = LinkResolver(slug_map)
 
         link = PageLink(url="non-existent")
         with pytest.raises(ValueError, match="Link Resolution Error"):
             resolver.resolve(link, sample_context)
+            
+    def test_resolve_absolute_path_passthrough(self, slug_map, sample_context):
+        """Test that absolute paths are allowed to pass through."""
+        resolver = LinkResolver(slug_map)
+
+        # Absolute paths should pass through
+        link = PageLink(url="/about")
+        result = resolver.resolve(link, sample_context)
+        assert result == "/about"
+        
+        link = PageLink(url="/api/docs")
+        result = resolver.resolve(link, sample_context)
+        assert result == "/api/docs"
 
     def test_resolve_external_link_unchanged(self, slug_map, sample_context):
         """Test that external links are not resolved."""
@@ -347,6 +360,10 @@ class TestPageSlugMapBuilder:
         assert slug_map["First Note"] == "/notes/first-note/"
         assert slug_map["second-note"] == "/notes/second-note/"
         assert slug_map["Second Note"] == "/notes/second-note/"
+        
+        # Should also map full paths with .md extension for IDE support
+        assert slug_map["first-note.md"] == "/notes/first-note/"
+        assert slug_map["second-note.md"] == "/notes/second-note/"
 
 
 class TestLinkResolutionBuildPlugin:
