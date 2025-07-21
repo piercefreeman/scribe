@@ -152,29 +152,32 @@ class TestLinkResolver:
         link = PageLink(url="first-note.md")
         result = resolver.resolve(link, sample_context)
         assert result == "/notes/first-note/"
-        
+
     def test_resolve_url_encoded_links(self):
         """Test resolution of URL-encoded links (e.g., spaces as %20)."""
         slug_map = {
             "Building our home network": "/notes/building-home-network/",
             "Building our home network.md": "/notes/building-home-network/",
             "home_network/Building our home network": "/notes/building-home-network/",
-            "home_network/Building our home network.md": "/notes/building-home-network/",
+            "home_network/Building our home network.md": (
+                "/notes/building-home-network/"
+            ),
         }
         resolver = LinkResolver(slug_map)
-        
+
         import tempfile
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             source_file = temp_path / "test.md"
             source_file.touch()
-            
+
             # Create the target file with spaces in name
             home_network_dir = temp_path / "home_network"
             home_network_dir.mkdir()
             target_file = home_network_dir / "Building our home network.md"
             target_file.touch()
-            
+
             ctx = PageContext(
                 source_path=source_file,
                 relative_path=Path("test.md"),
@@ -183,20 +186,20 @@ class TestLinkResolver:
                 raw_content="",
                 slug="test",
             )
-            
+
             # Test URL-encoded link resolution
             link = PageLink(url="./home_network/Building%20our%20home%20network.md")
             result = resolver.resolve(link, ctx)
             assert result == "/notes/building-home-network/"
 
     def test_resolve_no_match_raises_error(self, slug_map, sample_context):
-        """Test that resolution raises error when no match is found for relative links."""
+        """Test that resolution raises error when no match found for relative links."""
         resolver = LinkResolver(slug_map)
 
         link = PageLink(url="non-existent")
         with pytest.raises(ValueError, match="Link Resolution Error"):
             resolver.resolve(link, sample_context)
-            
+
     def test_resolve_absolute_path_passthrough(self, slug_map, sample_context):
         """Test that absolute paths are allowed to pass through."""
         resolver = LinkResolver(slug_map)
@@ -205,7 +208,7 @@ class TestLinkResolver:
         link = PageLink(url="/about")
         result = resolver.resolve(link, sample_context)
         assert result == "/about"
-        
+
         link = PageLink(url="/api/docs")
         result = resolver.resolve(link, sample_context)
         assert result == "/api/docs"
@@ -254,7 +257,7 @@ class TestLinkResolver:
 
             with pytest.raises(FileNotFoundError, match="Link Resolution Error"):
                 resolver.resolve(link, ctx)
-                
+
     def test_resolve_provides_helpful_error_messages(self):
         """Test that error messages include helpful suggestions."""
         slug_map = {
@@ -263,13 +266,14 @@ class TestLinkResolver:
             "About Us": "/about/",
         }
         resolver = LinkResolver(slug_map)
-        
+
         import tempfile
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             source_file = temp_path / "test.md"
             source_file.touch()
-            
+
             ctx = PageContext(
                 source_path=source_file,
                 relative_path=Path("test.md"),
@@ -278,13 +282,13 @@ class TestLinkResolver:
                 raw_content="",
                 slug="test",
             )
-            
+
             # Test that error includes available pages
             link = PageLink(url="page-three")
-            
+
             with pytest.raises(ValueError) as exc_info:
                 resolver.resolve(link, ctx)
-                
+
             error_message = str(exc_info.value)
             assert "Available pages:" in error_message
             assert "page-one" in error_message
@@ -396,7 +400,7 @@ class TestPageSlugMapBuilder:
         assert slug_map["First Note"] == "/notes/first-note/"
         assert slug_map["second-note"] == "/notes/second-note/"
         assert slug_map["Second Note"] == "/notes/second-note/"
-        
+
         # Should also map full paths with .md extension for IDE support
         assert slug_map["first-note.md"] == "/notes/first-note/"
         assert slug_map["second-note.md"] == "/notes/second-note/"

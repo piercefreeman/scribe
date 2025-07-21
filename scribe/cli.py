@@ -101,8 +101,8 @@ def main() -> None:
 )
 def build(config: Path | None, clean: bool) -> None:
     """Build the static site.
-    
-    Note: Set SCRIBE_ENVIRONMENT=production to skip taking new snapshots 
+
+    Note: Set SCRIBE_ENVIRONMENT=production to skip taking new snapshots
     and use only cached snapshots (recommended for CI/production builds).
     """
     site_config = ScribeConfig(config_file=config)

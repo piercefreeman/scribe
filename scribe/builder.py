@@ -262,7 +262,7 @@ class SiteBuilder:
 
         # Report any validation errors that occurred during the build
         self._report_build_errors()
-        
+
         # Fail the build if there were any errors
         if self.build_errors:
             error_count = sum(len(errors) for errors in self.build_errors.values())
