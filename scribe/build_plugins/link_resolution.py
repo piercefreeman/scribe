@@ -94,13 +94,28 @@ class LinkResolver:
             if resolved_url:
                 return resolved_url
 
-        # If original link was a .md file but we couldn't resolve it,
-        # check if file exists
+        # If we couldn't resolve the link, raise an error
+        # This applies to both .md links and non-.md links that look like internal references
         if was_md_link:
+            # For .md files, check if the file exists and provide a helpful error
             self._check_md_file_exists(original_url, ctx)
-
-        # No resolution found - return original or with .md extension
-        return cleaned_url + (".md" if not link.is_external() else "")
+            
+        # If we reach here, the link couldn't be resolved
+        # Raise an error to prevent broken links in production
+        available_pages = "\n".join(f"  - {page}" for page in sorted(self.slug_map.keys())[:10])
+        more_pages = f"\n  ... and {len(self.slug_map) - 10} more pages" if len(self.slug_map) > 10 else ""
+        
+        raise ValueError(
+            f"\n❌ Link Resolution Error\n"
+            f"  File: {ctx.source_path}\n"
+            f"  Broken link: '{original_url}'\n"
+            f"  Error: Could not resolve this internal link!\n"
+            f"\nThe link should match one of these patterns:\n"
+            f"  - Filename without extension: 'my-page' (not 'my-page.md')\n"
+            f"  - Relative path without extension: './subfolder/my-page'\n"
+            f"  - Page title: 'My Page Title'\n"
+            f"\nAvailable pages:\n{available_pages}{more_pages}"
+        )
 
     def _clean_url(self, url: str) -> str:
         """Clean and normalize a URL."""
@@ -149,10 +164,32 @@ class LinkResolver:
             resolved_path = target_path.resolve()
 
         if not resolved_path.exists():
+            # Try to provide helpful suggestions
+            suggestions = []
+            
+            # Check if file exists without .md extension
+            without_md = resolved_path.with_suffix("")
+            if without_md.exists():
+                suggestions.append(f"Found '{without_md.name}' - did you mean to link without .md extension?")
+            
+            # Check for similar files in the same directory
+            if resolved_path.parent.exists():
+                similar_files = [
+                    f.name for f in resolved_path.parent.glob("*.md")
+                    if f.stem.lower() == resolved_path.stem.lower() and f != resolved_path
+                ]
+                if similar_files:
+                    suggestions.append(f"Similar files found: {', '.join(similar_files)}")
+            
+            suggestion_text = "\n".join(f"  - {s}" for s in suggestions) if suggestions else ""
+            
             raise FileNotFoundError(
-                f"Markdown file not found: '{original_url}' "
-                f"referenced in '{ctx.source_path}'. "
-                f"Resolved path: '{resolved_path}'"
+                f"\n❌ Link Resolution Error\n"
+                f"  File: {ctx.source_path}\n"
+                f"  Broken link: '{original_url}'\n"
+                f"  Resolved to: '{resolved_path}'\n"
+                f"  Error: Target file does not exist!\n"
+                + (f"\nSuggestions:\n{suggestion_text}" if suggestion_text else "")
             )
 
 

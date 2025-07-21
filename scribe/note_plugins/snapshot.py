@@ -105,12 +105,18 @@ class SnapshotPlugin(NotePlugin[SnapshotPluginConfig]):
         if not self.enabled:
             return ctx
 
+        # Debug logging to help diagnose performance issues
+        logger.info(f"Snapshot plugin processing - production mode: {self._is_production_mode()}")
+        
         # Use traditional approach for backward compatibility with tests
         # The optimization is now in _snapshot_urls which pre-filters cached URLs
         urls = self._extract_urls_from_content(ctx.content)
         if urls:
+            logger.info(f"Found {len(urls)} URLs to process: {list(urls)}")
             await self._snapshot_urls(urls)
             ctx = self._update_links_with_metadata(ctx, urls)
+        else:
+            logger.info("No URLs found in content")
 
         return ctx
 
@@ -271,7 +277,7 @@ class SnapshotPlugin(NotePlugin[SnapshotPluginConfig]):
 
         # Get cached metadata to check current state
         metadata = self._get_cached_metadata(url)
-
+        
         # Handle cache hits with appropriate console messages for backward compatibility
         if metadata is not None:
             if metadata.success:
@@ -431,6 +437,15 @@ class SnapshotPlugin(NotePlugin[SnapshotPluginConfig]):
         # Pre-filter URLs to only include those that actually need snapshots
         # This provides performance optimization while maintaining compatibility
         urls_needing_snapshots = {url for url in urls if self._url_needs_snapshot(url)}
+        
+        logger.info(f"URL filtering: {len(urls)} total URLs, {len(urls_needing_snapshots)} need snapshots")
+        
+        if urls_needing_snapshots:
+            logger.info(f"URLs needing snapshots: {list(urls_needing_snapshots)}")
+        
+        cached_urls = urls - urls_needing_snapshots
+        if cached_urls:
+            logger.info(f"Cached/skipped URLs: {list(cached_urls)}")
 
         if not urls_needing_snapshots:
             logger.info("No URLs need snapshots - all cached or skipped")

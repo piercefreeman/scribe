@@ -262,6 +262,14 @@ class SiteBuilder:
 
         # Report any validation errors that occurred during the build
         self._report_build_errors()
+        
+        # Fail the build if there were any errors
+        if self.build_errors:
+            error_count = sum(len(errors) for errors in self.build_errors.values())
+            raise RuntimeError(
+                f"Build failed with {error_count} error(s). "
+                "See the errors above for details."
+            )
 
     async def build_file(self, file_path: Path) -> PageContext | None:
         """Build a single file and return its context."""

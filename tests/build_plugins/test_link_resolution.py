@@ -153,13 +153,13 @@ class TestLinkResolver:
         result = resolver.resolve(link, sample_context)
         assert result == "/notes/first-note/"
 
-    def test_resolve_no_match(self, slug_map, sample_context):
-        """Test resolution when no match is found."""
+    def test_resolve_no_match_raises_error(self, slug_map, sample_context):
+        """Test that resolution raises error when no match is found."""
         resolver = LinkResolver(slug_map)
 
         link = PageLink(url="non-existent")
-        result = resolver.resolve(link, sample_context)
-        assert result == "non-existent.md"
+        with pytest.raises(ValueError, match="Link Resolution Error"):
+            resolver.resolve(link, sample_context)
 
     def test_resolve_external_link_unchanged(self, slug_map, sample_context):
         """Test that external links are not resolved."""
@@ -203,8 +203,44 @@ class TestLinkResolver:
             # Test that non-existent .md file raises exception
             link = PageLink(url="nonexistent.md")
 
-            with pytest.raises(FileNotFoundError, match="Markdown file not found"):
+            with pytest.raises(FileNotFoundError, match="Link Resolution Error"):
                 resolver.resolve(link, ctx)
+                
+    def test_resolve_provides_helpful_error_messages(self):
+        """Test that error messages include helpful suggestions."""
+        slug_map = {
+            "page-one": "/notes/page-one/",
+            "page-two": "/notes/page-two/",
+            "About Us": "/about/",
+        }
+        resolver = LinkResolver(slug_map)
+        
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            source_file = temp_path / "test.md"
+            source_file.touch()
+            
+            ctx = PageContext(
+                source_path=source_file,
+                relative_path=Path("test.md"),
+                output_path=temp_path / "output" / "test.html",
+                content="",
+                raw_content="",
+                slug="test",
+            )
+            
+            # Test that error includes available pages
+            link = PageLink(url="page-three")
+            
+            with pytest.raises(ValueError) as exc_info:
+                resolver.resolve(link, ctx)
+                
+            error_message = str(exc_info.value)
+            assert "Available pages:" in error_message
+            assert "page-one" in error_message
+            assert "page-two" in error_message
+            assert "About Us" in error_message
 
 
 class TestHtmlLinkProcessor:

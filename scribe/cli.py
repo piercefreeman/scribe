@@ -100,7 +100,11 @@ def main() -> None:
     "--clean/--no-clean", default=True, help="Clean output directory before building"
 )
 def build(config: Path | None, clean: bool) -> None:
-    """Build the static site."""
+    """Build the static site.
+    
+    Note: Set SCRIBE_ENVIRONMENT=production to skip taking new snapshots 
+    and use only cached snapshots (recommended for CI/production builds).
+    """
     site_config = ScribeConfig(config_file=config)
 
     # Check if config file exists
